@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Navbar, NavbarBrand, NavbarContent, NavbarItem, Card, Chip, Button } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import Tux3DCanvas from './Tux3DCanvas.jsx';
 
 // Global Tokens
 const THEME = {
@@ -464,63 +465,21 @@ export default function HeroSection() {
           })}
         </svg>
 
-        {/* Child B — Tux Center (z-index: 3) — Desktop */}
+        {/* Child B — Interactive 3D Tux Center (z-index: 3) — Desktop */}
         <div
-          className="hidden md:flex items-center justify-center pointer-events-none"
+          className="hidden md:flex items-center justify-center pointer-events-auto"
           style={{
             position: 'absolute',
             left: '50%',
             top: '50%',
             transform: 'translate(-50%, -50%)',
-            animation: 'tuxBreath 3.2s ease-in-out infinite',
             zIndex: 3,
           }}
         >
-          {/* Glow ring SVG */}
-          <svg
-            width="200"
-            height="200"
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              zIndex: -1,
-              pointerEvents: 'none',
-            }}
-          >
-            <defs>
-              <filter id="glowRing">
-                <feGaussianBlur stdDeviation="8" result="blur" />
-              </filter>
-            </defs>
-            <circle
-              cx="100"
-              cy="100"
-              r="72"
-              fill="none"
-              stroke="#E05A38"
-              strokeWidth="1.5"
-              opacity="0.18"
-              filter="url(#glowRing)"
-            />
-          </svg>
-
-          {/* Inline Tux SVG */}
-          <svg width="110" height="130" viewBox="0 0 110 130">
-            <ellipse cx="55" cy="72" rx="38" ry="44" fill="#111111" />
-            <ellipse cx="55" cy="82" rx="22" ry="28" fill="#F0F4F8" />
-            <ellipse cx="20" cy="75" rx="13" ry="28" fill="#111111" transform="rotate(-15 20 75)" />
-            <ellipse cx="90" cy="75" rx="13" ry="28" fill="#111111" transform="rotate(15 90 75)" />
-            <circle cx="55" cy="32" r="26" fill="#111111" />
-            <circle cx="46" cy="28" r="7" fill="white" />
-            <circle cx="47" cy="29" r="3.5" fill="#111" />
-            <circle cx="64" cy="28" r="7" fill="white" />
-            <circle cx="65" cy="29" r="3.5" fill="#111" />
-            <polygon points="55,38 49,48 61,48" fill="#E05A38" />
-            <ellipse cx="41" cy="118" rx="12" ry="6" fill="#E05A38" transform="rotate(-10 41 118)" />
-            <ellipse cx="69" cy="118" rx="12" ry="6" fill="#E05A38" transform="rotate(10 69 118)" />
-          </svg>
+          <Tux3DCanvas
+            activeDistro={hoveredDistro ? DISTROS.find((d) => d.name === hoveredDistro) : null}
+            size={280}
+          />
         </div>
 
         {/* Child C — Distro Nodes (z-index: 2) — Desktop */}
@@ -685,58 +644,13 @@ export default function HeroSection() {
 
         {/* Mobile View — Below md breakpoint */}
         <div className="md:hidden flex flex-col items-center justify-center w-full min-h-[55vh] py-8 z-10 relative">
-          {/* Mobile Tux centered above chips */}
-          <div
-            className="relative flex items-center justify-center mb-10"
-            style={{
-              animation: 'tuxBreath 3.2s ease-in-out infinite',
-            }}
-          >
-            {/* Glow ring SVG */}
-            <svg
-              width="150"
-              height="150"
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                zIndex: -1,
-                pointerEvents: 'none',
-              }}
-            >
-              <defs>
-                <filter id="glowRingMobile">
-                  <feGaussianBlur stdDeviation="6" result="blur" />
-                </filter>
-              </defs>
-              <circle
-                cx="75"
-                cy="75"
-                r="52"
-                fill="none"
-                stroke="#E05A38"
-                strokeWidth="1.5"
-                opacity="0.18"
-                filter="url(#glowRingMobile)"
-              />
-            </svg>
-
-            {/* Tux scaled to width 80 */}
-            <svg width="80" height="95" viewBox="0 0 110 130">
-              <ellipse cx="55" cy="72" rx="38" ry="44" fill="#111111" />
-              <ellipse cx="55" cy="82" rx="22" ry="28" fill="#F0F4F8" />
-              <ellipse cx="20" cy="75" rx="13" ry="28" fill="#111111" transform="rotate(-15 20 75)" />
-              <ellipse cx="90" cy="75" rx="13" ry="28" fill="#111111" transform="rotate(15 90 75)" />
-              <circle cx="55" cy="32" r="26" fill="#111111" />
-              <circle cx="46" cy="28" r="7" fill="white" />
-              <circle cx="47" cy="29" r="3.5" fill="#111" />
-              <circle cx="64" cy="28" r="7" fill="white" />
-              <circle cx="65" cy="29" r="3.5" fill="#111" />
-              <polygon points="55,38 49,48 61,48" fill="#E05A38" />
-              <ellipse cx="41" cy="118" rx="12" ry="6" fill="#E05A38" transform="rotate(-10 41 118)" />
-              <ellipse cx="69" cy="118" rx="12" ry="6" fill="#E05A38" transform="rotate(10 69 118)" />
-            </svg>
+          {/* Mobile Interactive 3D Tux centered above chips */}
+          <div className="relative flex items-center justify-center mb-8 pointer-events-auto">
+            <Tux3DCanvas
+              activeDistro={hoveredDistro ? DISTROS.find((d) => d.name === hoveredDistro) : null}
+              size={210}
+              isMobile
+            />
           </div>
 
           {/* Horizontally scrollable chip row */}
@@ -908,6 +822,18 @@ export default function HeroSection() {
         >
           $ sudo find-your-distro
         </Button>
+        <p className="text-[11px] text-white/30 font-mono text-center max-w-md px-4 mt-2">
+          3D Tux model based on work by{' '}
+          <a
+            href="https://sketchfab.com/andycuccaro"
+            target="_blank"
+            rel="noreferrer"
+            className="text-white/50 hover:text-[#E05A38] underline transition-colors"
+          >
+            Andy Cuccaro
+          </a>{' '}
+          (CC-BY-4.0). Interactive 3D via Three.js.
+        </p>
       </div>
     </div>
   );
