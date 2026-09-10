@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   ExternalLink,
@@ -13,7 +13,20 @@ import {
   CheckCircle2,
   Calendar,
   Sparkles,
-  Monitor
+  Monitor,
+  Laptop,
+  Box,
+  Split,
+  AlertTriangle,
+  ShieldAlert,
+  Info,
+  Wrench,
+  Clock,
+  ChevronUp,
+  Compass,
+  Image as ImageIcon,
+  ZoomIn,
+  X
 } from 'lucide-react';
 import DistroIcon from './DistroIcon.jsx';
 import { DISTROS } from '../data/distros.js';
@@ -62,14 +75,320 @@ const STATIC_DOTS = [
   { top: '66%', left: '35%' },
 ];
 
+const getInstallationData = (distro) => {
+  const updateCmd =
+    distro.pkgMgr === 'apt'
+      ? 'sudo apt update && sudo apt upgrade -y'
+      : distro.pkgMgr === 'pacman'
+      ? 'sudo pacman -Syu'
+      : distro.pkgMgr === 'dnf'
+      ? 'sudo dnf upgrade --refresh -y'
+      : distro.pkgMgr === 'zypper'
+      ? 'sudo zypper refresh && sudo zypper dup'
+      : distro.installCmd || 'sudo apt update';
+
+  const guestAdditionsCmd =
+    distro.pkgMgr === 'apt'
+      ? 'sudo apt update && sudo apt install -y virtualbox-guest-x11'
+      : distro.pkgMgr === 'pacman'
+      ? 'sudo pacman -S --noconfirm virtualbox-guest-utils && sudo systemctl enable --now vboxservice'
+      : distro.pkgMgr === 'dnf'
+      ? 'sudo dnf install -y virtualbox-guest-additions'
+      : 'sudo apt install -y virtualbox-guest-x11';
+
+  return {
+    normal: {
+      id: 'normal',
+      title: 'Normal Boot (Clean Single OS)',
+      badge: 'Dedicated Machine • Complete Replacement',
+      icon: Laptop,
+      time: '15-20 mins',
+      risk: 'Erases Target Disk / Partition',
+      riskColor: '#F59E0B',
+      requirements: ['8GB+ USB Flash Drive', '25GB+ Free Storage', 'Complete Backup of Current Data'],
+      description: `Install ${distro.name} as your sole primary operating system directly on bare metal hardware for maximum performance, battery efficiency, and responsiveness.`,
+      steps: [
+        {
+          num: '01',
+          title: `Download Official ${distro.name} ISO Image`,
+          desc: `Acquire the latest official 64-bit desktop ISO release for ${distro.name}. Ensure the downloaded file matches official release integrity checksums.`,
+          action: distro.downloadUrl ? { label: `Download ${distro.name} ISO`, url: distro.downloadUrl } : null,
+          cmd: `sha256sum ${distro.id || 'distro'}-desktop-latest.iso`,
+          cmdLabel: 'Verify SHA256 Checksum (Linux/macOS Terminal):',
+          tip: 'Always download Linux ISOs from official mirrors or torrents to verify cryptographic authenticity.',
+          image: '/install-guide/normal_step1_download.png',
+          imageCaption: `Select and download official 64-bit desktop ISO release for ${distro.name}`
+        },
+        {
+          num: '02',
+          title: 'Create a Bootable USB Flash Drive',
+          desc: 'Flash the downloaded ISO onto a USB flash drive (minimum 8 GB). All existing data on this USB stick will be erased.',
+          tools: ['BalenaEtcher (Cross-platform GUI)', 'Rufus (Windows: choose GPT & UEFI)', 'Raspberry Pi Imager', 'Ventoy'],
+          cmd: `sudo dd if=${distro.id}-latest.iso of=/dev/sdX bs=4M status=progress conv=fsync`,
+          cmdLabel: 'Alternative Linux Terminal Flash (Replace /dev/sdX with USB path):',
+          warning: 'Double-check your target USB device path with "lsblk". Writing to the wrong disk identifier will permanently overwrite your data!',
+          image: '/install-guide/normal_step2_flash.png',
+          imageCaption: 'BalenaEtcher: Select target USB drive and flash bootable installation media'
+        },
+        {
+          num: '03',
+          title: 'Boot into UEFI / BIOS Setup',
+          desc: 'Insert the bootable USB into your computer and turn it on while repeatedly tapping your motherboard boot menu key.',
+          keys: ['F12 (Dell/Lenovo)', 'F11 (MSI)', 'F8 (ASUS)', 'F9 (HP)', 'Del / F2 (BIOS Setup)'],
+          tip: 'In your motherboard BIOS: Ensure UEFI Boot Mode is active and disable Fast Boot so the USB drive is promptly detected.',
+          image: '/install-guide/normal_step3_uefi.jpg',
+          imageCaption: 'Motherboard UEFI Boot Menu: Select USB flash drive as primary boot target'
+        },
+        {
+          num: '04',
+          title: `Run Guided Installer & Partition Disk`,
+          desc: `Boot into the live desktop environment and click "Install ${distro.name}". Proceed through language, keyboard layout, and timezone configuration.`,
+          options: [
+            { label: `Erase disk and install ${distro.name}`, detail: 'Recommended for clean installs: automatically creates EFI system partition, root (/), and swap space.' },
+            { label: 'Encrypt new installation (LUKS)', detail: 'Optional: Secures full-disk encryption with a boot passphrase for enterprise-level privacy.' }
+          ],
+          tip: `Provide your user account name and administrator (sudo) password when prompted, then proceed with the installation.`,
+          image: '/install-guide/normal_step4_partition.png',
+          imageCaption: 'Graphical Installer: Guided installation and automatic disk partitioning wizard'
+        },
+        {
+          num: '05',
+          title: 'Reboot & Perform First System Update',
+          desc: `When installation completes, click "Restart Now" and remove the USB drive when prompted. Log into your new desktop and update package repositories.`,
+          cmd: updateCmd,
+          cmdLabel: 'Run First System Update in Terminal:',
+          tip: `Congratulations! ${distro.name} is now installed as your primary operating system. Enjoy full hardware acceleration and freedom!`,
+          image: '/install-guide/normal_step5_firstboot.png',
+          imageCaption: 'First Desktop Boot: System package updater fetching security and stability updates'
+        }
+      ]
+    },
+    dual: {
+      id: 'dual',
+      title: 'Dual Boot (Windows 10/11 + Linux)',
+      badge: 'Side-by-Side • Shared Hardware',
+      icon: Split,
+      time: '25-35 mins',
+      risk: 'Resizes Windows Partition (Moderate)',
+      riskColor: '#EC4899',
+      requirements: ['40GB+ Free Unallocated Space', '8GB+ USB Drive', 'BitLocker Key Backed Up'],
+      description: `Run ${distro.name} side-by-side with your existing Windows installation on the same computer. Select which operating system to start every time you power on via the GRUB boot menu.`,
+      steps: [
+        {
+          num: '01',
+          title: 'Shrink Partition in Windows Disk Management',
+          desc: 'Boot into Windows and carve out unpartitioned space on your hard drive or SSD for Linux.',
+          substeps: [
+            'Press Win + X and select "Disk Management" (or press Win + R and type "diskmgmt.msc").',
+            'Right-click your main Windows partition (usually C:) and select "Shrink Volume...".',
+            'Enter the amount of space to shrink: enter at least 40000 MB (40 GB) up to 100000 MB (100 GB).',
+            'Click "Shrink". Crucial: Leave this newly created space as "Unallocated" — do NOT format it as NTFS in Windows!'
+          ],
+          warning: 'Always create a backup of your personal Windows files before shrinking or modifying storage partitions.',
+          image: '/install-guide/dual_step1_diskmgmt.png',
+          imageCaption: 'Windows Disk Management: Inspect drive partitions and shrink C: volume to create Unallocated Space'
+        },
+        {
+          num: '02',
+          title: 'Disable Windows Fast Startup & BitLocker',
+          desc: 'Windows Fast Startup puts system disks into a locked hibernation cache that blocks Linux from safely reading partitions or installing the GRUB bootloader.',
+          substeps: [
+            'Open Control Panel → Hardware and Sound → Power Options → "Choose what the power buttons do".',
+            'Click "Change settings that are currently unavailable".',
+            'Uncheck "Turn on fast startup (recommended)" and click Save Changes.',
+            'If BitLocker encryption is active on drive C:, suspend BitLocker in Windows settings and keep your 48-digit recovery key accessible.'
+          ],
+          warning: 'Failing to turn off Fast Startup may lead to read-only disk mounts or filesystem conflicts when switching between operating systems.',
+          image: '/install-guide/dual_step2_faststartup.png',
+          imageCaption: 'Windows Power Options: Uncheck "Turn on fast startup" to avoid partition hibernation lock'
+        },
+        {
+          num: '03',
+          title: 'Flash USB with Rufus (UEFI / GPT)',
+          desc: `Flash ${distro.name} ISO using Rufus with the correct partition scheme for modern UEFI machines.`,
+          substeps: [
+            'Open Rufus on Windows and select your USB flash drive.',
+            'Choose the downloaded ISO file.',
+            'Partition scheme: Select "GPT".',
+            'Target system: Select "UEFI (non-CSM)".',
+            'Click Start to write the image.'
+          ],
+          tip: 'In your PC BIOS setup: Ensure the SATA controller mode is set to AHCI (not Intel RST or RAID mode).',
+          image: '/install-guide/dual_step3_rufus.png',
+          imageCaption: 'Rufus: Select Partition scheme "GPT" and Target system "UEFI (non-CSM)"'
+        },
+        {
+          num: '04',
+          title: `Install ${distro.name} Alongside Windows`,
+          desc: 'Boot from your USB flash drive and launch the graphical installer.',
+          substeps: [
+            `When reaching the Installation Type step, select: "Install ${distro.name} alongside Windows Boot Manager" (recommended automatic mode).`,
+            `If choosing Manual Partitioning ("Something else"): Select the Free Unallocated Space, create an EFI partition (if needed), and a Root (/) partition formatted as ext4 or btrfs.`,
+            'Ensure the bootloader is placed on the primary disk EFI partition (e.g., /dev/nvme0n1 or /dev/sda).'
+          ],
+          tip: 'The installer will automatically detect Windows Boot Manager and add an entry into the GRUB bootloader.',
+          image: '/install-guide/dual_step4_alongside.png',
+          imageCaption: 'Installer Type: Select "Install alongside Windows Boot Manager" for automatic dual-boot config'
+        },
+        {
+          num: '05',
+          title: 'Reboot & Select OS via GRUB Menu',
+          desc: 'Remove the USB flash drive and restart your PC. The GRUB bootloader menu will now appear on startup, letting you select Linux or Windows.',
+          cmd: updateCmd,
+          cmdLabel: 'Initial Update Command in Linux:',
+          tip: 'If your computer boots straight into Windows, enter BIOS/UEFI settings and move the Linux GRUB entry to the top of your Boot Priority list.',
+          image: '/install-guide/dual_step5_grub.png',
+          imageCaption: 'GNU GRUB Bootloader: Switch seamlessly between Linux and Windows Boot Manager'
+        }
+      ]
+    },
+    vm: {
+      id: 'vm',
+      title: 'Virtual Machine (Safe Sandbox)',
+      badge: '100% Risk-Free • In-Window Testing',
+      icon: Box,
+      time: '10-15 mins',
+      risk: 'Zero Risk to Host OS',
+      riskColor: '#10B981',
+      requirements: ['Host PC with 8GB+ RAM', 'VirtualBox / VMware / UTM', 'Hardware Virtualization (VT-x/AMD-V)'],
+      description: `Run ${distro.name} safely inside an isolated virtual window on your current Windows, macOS, or Linux desktop without modifying your physical storage drives or bootloader.`,
+      steps: [
+        {
+          num: '01',
+          title: 'Install a Virtualization Hypervisor',
+          desc: 'Install hypervisor software suited for your host operating system.',
+          tools: [
+            'Oracle VirtualBox (Free & Open Source for Windows, Mac, Linux)',
+            'VMware Workstation Player (Windows & Linux)',
+            'UTM (Native high-performance hypervisor for Apple Silicon Mac M1/M2/M3)',
+            'Virt-Manager / KVM (Linux Native)'
+          ],
+          tip: 'Ensure CPU Virtualization (Intel VT-x or AMD-V) is enabled in your BIOS/UEFI settings.',
+          image: '/install-guide/vm_step1_virtualbox.png',
+          imageCaption: 'Oracle VM VirtualBox: Open-source hypervisor manager for running isolated virtual machines'
+        },
+        {
+          num: '02',
+          title: `Create a New Virtual Machine Profile`,
+          desc: `Open your hypervisor and click "New" to allocate virtual hardware resources for ${distro.name}.`,
+          substeps: [
+            `Name: "${distro.name} VM"`,
+            `Type: Linux | Version: ${distro.basedOn || 'Ubuntu'} (64-bit)`,
+            'Base Memory (RAM): Allocate at least 4096 MB (4 GB). If your host has 16GB+ RAM, assign 6GB-8GB.',
+            'Processors: Assign 2 to 4 virtual CPU cores for responsive graphics and app loading.',
+            'Virtual Hard Disk: Create a 25 GB to 40 GB dynamically allocated disk (VDI or VMDK format).'
+          ],
+          action: distro.downloadUrl ? { label: `Download ${distro.name} ISO`, url: distro.downloadUrl } : null,
+          image: '/install-guide/vm_step2_profile.png',
+          imageCaption: 'Virtual Machine Creation Wizard: Allocate base memory RAM and virtual CPU processor cores'
+        },
+        {
+          num: '03',
+          title: 'Attach ISO & Enable Video Acceleration',
+          desc: 'Mount the downloaded ISO into the virtual machine optical disc drive and optimize display parameters.',
+          substeps: [
+            'Go to VM Settings → Storage → Optical Drive → Choose a disk file → select the downloaded ISO.',
+            'Go to VM Settings → Display → Increase Video Memory to 128 MB.',
+            'Check "Enable 3D Acceleration" (ensures smooth window compositing and desktop animations).'
+          ],
+          image: '/install-guide/vm_step3_storage.png',
+          imageCaption: 'Storage Settings: Mount downloaded Linux ISO to Virtual Optical Drive and allocate video memory'
+        },
+        {
+          num: '04',
+          title: 'Power On & Complete In-Window Setup',
+          desc: 'Click "Start" to launch the virtual machine. The installer runs safely isolated inside your application window.',
+          substeps: [
+            'Select "Try or Install" in the virtual boot menu.',
+            'Choose "Erase disk and install" — this only touches the virtual disk (.vdi), NOT your physical computer!',
+            'Complete username, password, and desktop layout setup, then restart the virtual machine.'
+          ],
+          tip: 'In VirtualBox, press the Right Control key (Host Key) anytime if your mouse cursor gets trapped inside the VM window.',
+          image: '/install-guide/vm_step4_running.png',
+          imageCaption: 'Live Installer executing safely inside virtual window without altering host disk partitions'
+        },
+        {
+          num: '05',
+          title: 'Install Guest Additions for Seamless Display',
+          desc: 'Install hypervisor integration tools to enable automatic window resolution scaling, bidirectional clipboard, and folder sharing.',
+          cmd: guestAdditionsCmd,
+          cmdLabel: 'Run Inside VM Terminal to Enable Guest Features:',
+          substeps: [
+            'In VirtualBox top menu: Click Devices → "Insert Guest Additions CD image...".',
+            'Run the terminal command above to install native kernel integration packages.',
+            'Reboot the virtual machine to enjoy auto-resizing full-screen resolution and shared clipboard!'
+          ],
+          image: '/install-guide/vm_step5_additions.png',
+          imageCaption: 'VirtualBox Guest Additions: Dynamic window resolution auto-fit, clipboard sharing and folders'
+        }
+      ]
+    }
+  };
+};
+
 export default function DistroDetailPage({ distroId, onNavigate }) {
-  const [copied, setCopied] = useState(false);
+  const [installMode, setInstallMode] = useState('normal'); // 'normal' | 'dual' | 'vm'
+  const [copiedCmdId, setCopiedCmdId] = useState(null);
+  const [showSideNav, setShowSideNav] = useState(false);
+  const [activeSection, setActiveSection] = useState('hero');
+  const [isNavExpanded, setIsNavExpanded] = useState(false);
+  const [activeLightboxImage, setActiveLightboxImage] = useState(null);
+
+  // Close lightbox on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setActiveLightboxImage(null);
+    };
+    if (activeLightboxImage) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeLightboxImage]);
 
   // Scroll hooks: parallax and fade into normal background as user scrolls down
   const { scrollY } = useScroll();
   const bannerY = useTransform(scrollY, [0, 900], [0, 200]);
   const bannerOpacity = useTransform(scrollY, [150, 850], [1, 0]);
   const bannerScale = useTransform(scrollY, [0, 900], [1, 1.06]);
+
+  // Scrollspy & side nav visibility detector
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPos = window.scrollY;
+      setShowSideNav(scrollPos > 280);
+
+      const specsEl = document.getElementById('section-specs');
+      const installEl = document.getElementById('section-install');
+      const exploreEl = document.getElementById('section-explore');
+
+      const triggerOffset = window.innerHeight * 0.4;
+
+      if (exploreEl && exploreEl.getBoundingClientRect().top <= triggerOffset) {
+        setActiveSection('explore');
+      } else if (installEl && installEl.getBoundingClientRect().top <= triggerOffset) {
+        setActiveSection('install');
+      } else if (specsEl && specsEl.getBoundingClientRect().top <= triggerOffset) {
+        setActiveSection('specs');
+      } else {
+        setActiveSection('hero');
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToSection = (sectionId) => {
+    if (sectionId === 'section-hero') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      const el = document.getElementById(sectionId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
 
   // Find distro by ID or name
   const distro =
@@ -81,11 +400,14 @@ export default function DistroDetailPage({ distroId, onNavigate }) {
 
   const otherDistros = DISTROS.filter((d) => d.id !== distro.id).slice(0, 4);
 
-  const copyInstallCmd = () => {
-    if (distro.installCmd) {
-      navigator.clipboard.writeText(distro.installCmd);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  const installationData = getInstallationData(distro);
+  const currentMode = installationData[installMode] || installationData.normal;
+
+  const copyStepCmd = (cmd, stepId) => {
+    if (cmd) {
+      navigator.clipboard.writeText(cmd);
+      setCopiedCmdId(stepId);
+      setTimeout(() => setCopiedCmdId(null), 2000);
     }
   };
 
@@ -280,7 +602,7 @@ export default function DistroDetailPage({ distroId, onNavigate }) {
       {/* Main Content — Specifications remain below the fold until scroll */}
       <main className="relative z-10 flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-24">
         {/* Distro Hero Header — Full Viewport First Screen */}
-        <div className="w-full min-h-[calc(100vh-6.5rem)] flex flex-col items-center text-center justify-center gap-6 pb-12 mx-auto">
+        <div id="section-hero" className="w-full min-h-[calc(100vh-6.5rem)] flex flex-col items-center text-center justify-center gap-6 pb-12 mx-auto">
           {/* Logo — Centered in the middle of the page */}
           <div className="w-full flex justify-center items-center">
             <div
@@ -352,7 +674,7 @@ export default function DistroDetailPage({ distroId, onNavigate }) {
         </div>
 
         {/* Technical Specification Matrix */}
-        <section className="mb-12">
+        <section id="section-specs" className="mb-12 scroll-mt-24">
           <h2 className="text-lg font-mono font-bold text-white/90 mb-4 flex items-center gap-2">
             <Sparkles size={16} style={{ color: distro.accent }} />
             <span>Technical Specifications</span>
@@ -386,70 +708,247 @@ export default function DistroDetailPage({ distroId, onNavigate }) {
           </div>
         </section>
 
-        {/* Overview & Key Highlights */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-          {/* About Description */}
-          <div className="lg:col-span-2 p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10">
-            <h2 className="text-xl font-mono font-bold text-white mb-4">
-              About {distro.name}
+        {/* Installation & Setup Guide Section */}
+        <section id="section-install" className="mb-14 pt-4 border-t border-white/10 scroll-mt-24">
+          {/* Section Header */}
+          <div className="mb-6">
+            <h2 className="text-2xl font-mono font-bold text-white mb-1.5 flex items-center gap-2.5">
+              <Wrench size={20} style={{ color: distro.accent }} />
+              <span>How to Install {distro.name}</span>
             </h2>
-            <p className="text-sm sm:text-base leading-relaxed text-white/80 font-sans mb-6">
-              {distro.description}
+            <p className="text-sm font-mono text-white/60">
+              Select your installation method and follow the step-by-step instructions.
             </p>
-
-            {/* Quick Terminal Command */}
-            {distro.installCmd && (
-              <div className="rounded-2xl p-4 bg-black/60 border border-white/10 font-mono text-xs">
-                <div className="flex items-center justify-between text-white/50 mb-2">
-                  <span className="flex items-center gap-1.5">
-                    <Terminal size={13} />
-                    <span>Package Management Command</span>
-                  </span>
-                  <button
-                    onClick={copyInstallCmd}
-                    className="flex items-center gap-1 text-white/60 hover:text-white transition-colors"
-                  >
-                    {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
-                    <span>{copied ? 'Copied!' : 'Copy'}</span>
-                  </button>
-                </div>
-                <code className="text-[#38BDF8] block overflow-x-auto select-all">
-                  $ {distro.installCmd}
-                </code>
-              </div>
-            )}
           </div>
 
-          {/* Key Highlights */}
-          {distro.keyFeatures && (
-            <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 flex flex-col justify-between">
-              <div>
-                <h2 className="text-xl font-mono font-bold text-white mb-4">
-                  Key Highlights
-                </h2>
-                <ul className="space-y-3 font-sans text-xs sm:text-sm text-white/80">
-                  {distro.keyFeatures.map((feat, idx) => (
-                    <li key={idx} className="flex items-start gap-2.5">
-                      <CheckCircle2
-                        size={16}
-                        className="shrink-0 mt-0.5"
-                        style={{ color: distro.accent }}
-                      />
-                      <span>{feat}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          {/* Simple Mode Switcher (Pill Tabs) */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {[
+              { id: 'normal', name: 'Normal Boot', icon: Laptop },
+              { id: 'dual', name: 'Dual Boot (Windows)', icon: Split },
+              { id: 'vm', name: 'Virtual Machine', icon: Box },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = installMode === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setInstallMode(tab.id)}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-mono text-xs font-semibold transition-all cursor-pointer ${
+                    isActive
+                      ? 'text-white shadow-md'
+                      : 'text-white/60 hover:text-white hover:bg-white/10 bg-transparent border border-white/15'
+                  }`}
+                  style={{
+                    background: isActive ? distro.accent : undefined,
+                    borderColor: isActive ? distro.accent : undefined,
+                  }}
+                >
+                  <Icon size={14} />
+                  <span>{tab.name}</span>
+                </button>
+              );
+            })}
+          </div>
 
-              <div className="pt-6 mt-6 border-t border-white/10 font-mono text-xs text-white/50">
-                <span>Verified distribution profile</span>
+          {/* Simple Meta info (Time & Requirements) */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-mono text-white/50 mb-8 pb-4 border-b border-white/10">
+            <span className="text-white/90 font-semibold">{currentMode.title}</span>
+            <span>•</span>
+            <span className="flex items-center gap-1">
+              <Clock size={12} className="text-[#38BDF8]" />
+              <span>{currentMode.time}</span>
+            </span>
+            <span>•</span>
+            <span>Prerequisites: {currentMode.requirements.join(', ')}</span>
+          </div>
+
+          {/* Simple Step-by-Step List (No Cards) */}
+          <div className="space-y-8">
+            {currentMode.steps.map((step, idx) => (
+              <div key={idx} className="flex items-start gap-4 sm:gap-6">
+                {/* Step Number */}
+                <div
+                  className="font-mono font-bold text-sm sm:text-base shrink-0 select-none pt-0.5"
+                  style={{ color: distro.accent }}
+                >
+                  {step.num}.
+                </div>
+
+                {/* Step Content */}
+                <div className="flex-1 space-y-3">
+                  <h3 className="font-mono text-base font-bold text-white">
+                    {step.title}
+                  </h3>
+                  <p className="font-sans text-sm text-white/75 leading-relaxed">
+                    {step.desc}
+                  </p>
+
+                  {/* Direct Action button if any (e.g. Download ISO) */}
+                  {step.action && (
+                    <div className="pt-1">
+                      <a
+                        href={step.action.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                        style={{ background: distro.accent }}
+                      >
+                        <Download size={13} />
+                        <span>{step.action.label}</span>
+                        <ExternalLink size={12} />
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Substeps list */}
+                  {step.substeps && (
+                    <ul className="space-y-1.5 font-sans text-xs sm:text-sm text-white/75 list-disc list-inside pt-1">
+                      {step.substeps.map((sub, i) => (
+                        <li key={i} className="leading-relaxed">
+                          <span className="text-white/80">{sub}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {/* Partition / Installer options */}
+                  {step.options && (
+                    <div className="space-y-2 pt-1 font-sans text-xs sm:text-sm">
+                      {step.options.map((opt, i) => (
+                        <div key={i} className="text-white/80">
+                          <span className="font-mono font-semibold text-white">
+                            • {opt.label}:
+                          </span>{' '}
+                          <span className="text-white/60">{opt.detail}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Tools & Keys */}
+                  {step.tools && (
+                    <div className="text-xs font-mono text-white/60 pt-1">
+                      <span className="text-white/40">Tools: </span>
+                      {step.tools.join(' • ')}
+                    </div>
+                  )}
+                  {step.keys && (
+                    <div className="text-xs font-mono text-white/60 pt-1">
+                      <span className="text-white/40">Boot keys: </span>
+                      {step.keys.join(', ')}
+                    </div>
+                  )}
+
+                  {/* Terminal Command Box */}
+                  {step.cmd && (
+                    <div className="pt-1">
+                      <div className="rounded-lg p-3 bg-black/60 border border-white/10 font-mono text-xs max-w-2xl">
+                        <div className="flex items-center justify-between text-white/40 mb-1 text-[11px]">
+                          <span>{step.cmdLabel || 'Command'}</span>
+                          <button
+                            onClick={() => copyStepCmd(step.cmd, `${currentMode.id}-${step.num}`)}
+                            className="flex items-center gap-1 text-white/60 hover:text-white transition-colors cursor-pointer"
+                          >
+                            {copiedCmdId === `${currentMode.id}-${step.num}` ? (
+                              <>
+                                <Check size={12} className="text-green-400" />
+                                <span className="text-green-400">Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={12} />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <code className="text-[#38BDF8] block overflow-x-auto select-all">
+                          $ {step.cmd}
+                        </code>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Warning / Caution */}
+                  {step.warning && (
+                    <div className="flex items-start gap-2 text-xs font-sans text-amber-300/90 pt-1">
+                      <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-400" />
+                      <span>
+                        <strong className="font-mono text-amber-300">Note: </strong>
+                        {step.warning}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Informational Tip */}
+                  {step.tip && (
+                    <div className="flex items-start gap-2 text-xs font-sans text-white/60 pt-1">
+                      <Info size={14} className="shrink-0 mt-0.5" style={{ color: distro.accent }} />
+                      <span>
+                        <strong className="font-mono text-white/80">Tip: </strong>
+                        {step.tip}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Real Image Visual Reference */}
+                  {step.image && (
+                    <div className="pt-2 max-w-2xl">
+                      <div
+                        onClick={() =>
+                          setActiveLightboxImage({
+                            url: step.image,
+                            title: step.title,
+                            caption: step.imageCaption,
+                            num: step.num,
+                          })
+                        }
+                        className="group relative rounded-xl border border-white/15 bg-black/40 overflow-hidden shadow-xl hover:border-white/35 transition-all cursor-pointer"
+                      >
+                        <div className="relative overflow-hidden bg-black/50">
+                          <img
+                            src={step.image}
+                            alt={step.title}
+                            loading="lazy"
+                            className="w-full h-auto max-h-72 object-cover object-top brightness-[0.92] group-hover:brightness-100 group-hover:scale-[1.01] transition-all duration-300"
+                            onError={(e) => {
+                              if (e.currentTarget?.parentElement?.parentElement) {
+                                e.currentTarget.parentElement.parentElement.style.display = 'none';
+                              }
+                            }}
+                          />
+                          {/* Subtle hover overlay with zoom icon */}
+                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-white font-mono text-xs shadow-lg">
+                              <ZoomIn size={13} />
+                              <span>Click to enlarge</span>
+                            </div>
+                          </div>
+                        </div>
+                        {step.imageCaption && (
+                          <div className="px-3.5 py-2 bg-[#0d1117]/90 border-t border-white/10 flex items-center justify-between text-xs font-mono text-white/60">
+                            <div className="flex items-center gap-2 truncate pr-2">
+                              <ImageIcon size={13} className="shrink-0" style={{ color: distro.accent }} />
+                              <span className="truncate">{step.imageCaption}</span>
+                            </div>
+                            <span className="shrink-0 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/50">
+                              Real Reference
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
+        </section>
 
         {/* Explore Other Flavours */}
-        <section className="pt-8 border-t border-white/10">
+        <section id="section-explore" className="pt-8 border-t border-white/10 scroll-mt-24">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-mono font-bold text-white">
               Explore Other Distributions
@@ -489,6 +988,251 @@ export default function DistroDetailPage({ distroId, onNavigate }) {
           </div>
         </section>
       </main>
+
+      {/* Floating Side Navigation Dock — appears smoothly after scrolling & expands on hover */}
+      <AnimatePresence>
+        {showSideNav && (
+          <motion.aside
+            initial={{ opacity: 0, x: -28, scale: 0.92 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -28, scale: 0.92 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed left-3 sm:left-6 inset-y-0 my-auto h-fit z-40 hidden md:flex flex-col items-start pointer-events-auto"
+            style={{
+              top: 0,
+              bottom: 0,
+              marginTop: 'auto',
+              marginBottom: 'auto',
+              height: 'fit-content',
+            }}
+            aria-label="Section navigation"
+          >
+            <motion.div
+              onMouseEnter={() => setIsNavExpanded(true)}
+              onMouseLeave={() => setIsNavExpanded(false)}
+              animate={{ width: isNavExpanded ? 200 : 54 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              className="p-1.5 rounded-2xl flex flex-col items-start gap-1.5 select-none shadow-2xl backdrop-blur-2xl overflow-hidden cursor-pointer"
+              style={{
+                background: 'rgba(15, 18, 24, 0.88)',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                boxShadow: '0 12px 40px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.15) inset',
+              }}
+            >
+              {/* Distro Mini Avatar / Hero Jump */}
+              <button
+                type="button"
+                onClick={() => scrollToSection('section-hero')}
+                className={`w-full h-10 rounded-xl flex items-center transition-all cursor-pointer hover:scale-[1.02] overflow-hidden ${
+                  isNavExpanded ? 'px-2.5 gap-2.5 justify-start' : 'justify-center'
+                }`}
+                style={{
+                  background: activeSection === 'hero' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255,255,255,0.04)',
+                  border: activeSection === 'hero' ? '1px solid rgba(255, 255, 255, 0.38)' : '1px solid rgba(255,255,255,0.08)',
+                  boxShadow: activeSection === 'hero' ? '0 2px 14px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.45)' : undefined,
+                }}
+                aria-label="Scroll to Overview"
+              >
+                <div className="w-7 h-7 shrink-0 flex items-center justify-center">
+                  <DistroIcon name={distro.name} accent={distro.accent} size={20} />
+                </div>
+                <span
+                  className={`font-mono text-xs font-bold text-white whitespace-nowrap transition-all duration-200 ${
+                    isNavExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0'
+                  }`}
+                >
+                  {distro.name}
+                </span>
+              </button>
+
+              <div className={`h-px bg-white/10 transition-all duration-200 self-center ${isNavExpanded ? 'w-full' : 'w-6'}`} />
+
+              {/* Navigation Items */}
+              {[
+                { id: 'section-specs', key: 'specs', label: 'Tech Specs', icon: Sparkles },
+                { id: 'section-install', key: 'install', label: 'Install Guide', icon: Wrench },
+                { id: 'section-explore', key: 'explore', label: 'Other Distros', icon: Compass },
+              ].map((item) => {
+                const Icon = item.icon;
+                const isActive = activeSection === item.key;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => scrollToSection(item.id)}
+                    className={`w-full h-10 rounded-xl flex items-center transition-all cursor-pointer overflow-hidden ${
+                      isNavExpanded ? 'px-2.5 gap-2.5 justify-start' : 'justify-center'
+                    } ${
+                      isActive
+                        ? 'text-white font-bold'
+                        : 'text-white/50 hover:text-white hover:bg-white/10'
+                    }`}
+                    style={{
+                      background: isActive ? 'rgba(255, 255, 255, 0.18)' : 'transparent',
+                      border: isActive ? '1px solid rgba(255, 255, 255, 0.38)' : '1px solid transparent',
+                      color: isActive ? '#FFFFFF' : undefined,
+                      boxShadow: isActive ? '0 2px 14px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.45)' : undefined,
+                    }}
+                    aria-label={item.label}
+                  >
+                    <div className="w-7 h-7 shrink-0 flex items-center justify-center">
+                      <Icon size={17} />
+                    </div>
+                    <span
+                      className={`font-mono text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                        isActive ? 'text-white' : 'text-white/80'
+                      } ${
+                        isNavExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0'
+                      }`}
+                    >
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+
+              <div className={`h-px bg-white/10 transition-all duration-200 self-center ${isNavExpanded ? 'w-full' : 'w-6'}`} />
+
+              {/* Direct Download ISO Action */}
+              {distro.downloadUrl && (
+                <a
+                  href={distro.downloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`w-full h-10 rounded-xl flex items-center transition-all cursor-pointer hover:scale-[1.02] text-white overflow-hidden ${
+                    isNavExpanded ? 'px-2.5 gap-2.5 justify-start' : 'justify-center'
+                  }`}
+                  style={{
+                    background: `linear-gradient(135deg, ${distro.accent} 0%, #b83d25 120%)`,
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    boxShadow: `0 3px 12px ${distro.accent}40`,
+                  }}
+                  aria-label="Download ISO"
+                >
+                  <div className="w-7 h-7 shrink-0 flex items-center justify-center">
+                    <Download size={15} />
+                  </div>
+                  <span
+                    className={`font-mono text-xs font-bold text-white whitespace-nowrap transition-all duration-200 ${
+                      isNavExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0'
+                    }`}
+                  >
+                    Download ISO
+                  </span>
+                </a>
+              )}
+
+              {/* Scroll to Top Action */}
+              <button
+                type="button"
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                className={`w-full h-10 rounded-xl flex items-center transition-all cursor-pointer text-white/40 hover:text-white hover:bg-white/10 overflow-hidden ${
+                  isNavExpanded ? 'px-2.5 gap-2.5 justify-start' : 'justify-center'
+                }`}
+                aria-label="Scroll to top"
+              >
+                <div className="w-7 h-7 shrink-0 flex items-center justify-center">
+                  <ChevronUp size={18} />
+                </div>
+                <span
+                  className={`font-mono text-xs font-semibold text-white/70 whitespace-nowrap transition-all duration-200 ${
+                    isNavExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0'
+                  }`}
+                >
+                  Back to Top
+                </span>
+              </button>
+            </motion.div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Floating Scroll To Top Pill */}
+      <AnimatePresence>
+        {showSideNav && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 12 }}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="md:hidden fixed bottom-6 right-5 z-40 w-11 h-11 rounded-full bg-[#0E1217]/90 border border-white/20 text-white flex items-center justify-center shadow-2xl backdrop-blur-xl cursor-pointer"
+            style={{
+              boxShadow: `0 4px 20px rgba(0,0,0,0.6)`,
+            }}
+            aria-label="Back to top"
+          >
+            <ChevronUp size={20} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Real Screenshot Lightbox Modal */}
+      <AnimatePresence>
+        {activeLightboxImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setActiveLightboxImage(null)}
+            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 cursor-zoom-out"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-w-4xl max-h-[90vh] w-full rounded-2xl border border-white/20 bg-[#0d1117] overflow-hidden shadow-2xl flex flex-col cursor-default"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10 bg-black/50">
+                <div className="flex items-center gap-2.5 truncate pr-2">
+                  <span
+                    className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-white/10 shrink-0"
+                    style={{ color: distro.accent }}
+                  >
+                    Step {activeLightboxImage.num}
+                  </span>
+                  <h4 className="font-mono text-sm font-semibold text-white truncate">
+                    {activeLightboxImage.title}
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveLightboxImage(null)}
+                  className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer shrink-0"
+                  aria-label="Close image preview"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Image Body */}
+              <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-black/70">
+                <img
+                  src={activeLightboxImage.url}
+                  alt={activeLightboxImage.title}
+                  className="max-h-[72vh] w-auto max-w-full rounded-lg object-contain shadow-2xl border border-white/10"
+                />
+              </div>
+
+              {/* Modal Footer Caption */}
+              {activeLightboxImage.caption && (
+                <div className="px-5 py-3 border-t border-white/10 bg-black/50 text-xs font-mono text-white/75 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 truncate">
+                    <Info size={14} className="shrink-0" style={{ color: distro.accent }} />
+                    <span className="truncate">{activeLightboxImage.caption}</span>
+                  </div>
+                  <span className="shrink-0 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/50">
+                    Real Screenshot
+                  </span>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
