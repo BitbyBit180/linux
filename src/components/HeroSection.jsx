@@ -781,32 +781,31 @@ export default function HeroSection() {
         >
           Every distro has a story. Find yours.
         </p>
-        <Button
-          size="lg"
-          radius="full"
+        <button
           style={{
             background: THEME.accent,
             color: THEME.textMain,
             fontFamily: 'monospace',
             fontSize: '0.85rem',
+            fontWeight: 600,
             padding: '12px 32px',
+            borderRadius: '9999px',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'background 0.2s ease, box-shadow 0.2s ease',
           }}
-          className="hover:bg-[#E8A27C] hover:shadow-[0_4px_20px_#E05A3855] transition-all font-semibold"
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#b83d25';
+            e.currentTarget.style.boxShadow = '0 4px 20px #E05A3855';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = THEME.accent;
+            e.currentTarget.style.boxShadow = 'none';
+          }}
         >
           $ sudo find-your-distro
-        </Button>
-        <p className="text-[11px] text-white/30 font-mono text-center max-w-md px-4 mt-2">
-          3D Tux model based on work by{' '}
-          <a
-            href="https://sketchfab.com/andycuccaro"
-            target="_blank"
-            rel="noreferrer"
-            className="text-white/50 hover:text-[#E05A38] underline transition-colors"
-          >
-            Andy Cuccaro
-          </a>{' '}
-          (CC-BY-4.0). Interactive 3D via Three.js.
-        </p>
+        </button>
+
       </div>
     </div>
   );
