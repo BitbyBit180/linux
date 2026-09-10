@@ -10,6 +10,11 @@ body {
   margin: 0;
   padding: 0;
   background-color: #161B22;
+  background-image: url('/bg-texture.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: #F0F4F8;
   font-family: 'JetBrains Mono', monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }

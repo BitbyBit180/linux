@@ -3,6 +3,7 @@ import { Navbar, NavbarBrand, NavbarContent, NavbarItem, Card, Chip, Button } fr
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import Tux3DCanvas from './Tux3DCanvas.jsx';
+import DistroIcon from './DistroIcon.jsx';
 
 // Global Tokens
 const THEME = {
@@ -25,6 +26,7 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'apt',
     angle: -90,
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Ubuntu_24.04_LTS_Desktop.png/1280px-Ubuntu_24.04_LTS_Desktop.png',
   },
   {
     name: 'Debian',
@@ -34,6 +36,7 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'apt',
     angle: -45,
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Debian_12_%22Bookworm%22_-_GNOME_Desktop.png/1280px-Debian_12_%22Bookworm%22_-_GNOME_Desktop.png',
   },
   {
     name: 'Arch Linux',
@@ -43,6 +46,7 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'pacman',
     angle: 0,
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Arch_linux_2022_screenshot.png/1280px-Arch_linux_2022_screenshot.png',
   },
   {
     name: 'Fedora',
@@ -52,6 +56,7 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'dnf',
     angle: 45,
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/Fedora_40_Desktop.png/1280px-Fedora_40_Desktop.png',
   },
   {
     name: 'openSUSE',
@@ -61,6 +66,7 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'zypper',
     angle: 90,
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/OpenSUSE_Leap_15.6_-_GNOME.png/1280px-OpenSUSE_Leap_15.6_-_GNOME.png',
   },
   {
     name: 'Manjaro',
@@ -70,6 +76,7 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'pacman',
     angle: 135,
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Manjaro-Linux-22.1.3-GNOME.png/1280px-Manjaro-Linux-22.1.3-GNOME.png',
   },
   {
     name: 'Linux Mint',
@@ -79,6 +86,7 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'apt',
     angle: 180,
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Linux_Mint_21.3_Cinnamon.png/1280px-Linux_Mint_21.3_Cinnamon.png',
   },
   {
     name: 'Pop!_OS',
@@ -88,6 +96,7 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'apt',
     angle: 225,
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Pop_os-22.04-Desktop.png/1280px-Pop_os-22.04-Desktop.png',
   },
 ];
 
@@ -174,123 +183,6 @@ const STATIC_DOTS = [
   { top: '62%', left: '2%' },
 ];
 
-// Distro Vector Icons
-function DistroIcon({ name, accent }) {
-  switch (name) {
-    case 'Ubuntu':
-      return (
-        <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
-          <circle cx="19" cy="19" r="14" stroke={accent} strokeWidth="2.5" />
-          <circle cx="19" cy="5.5" r="3.8" fill={accent} />
-          <circle cx="30.7" cy="25.8" r="3.8" fill={accent} />
-          <circle cx="7.3" cy="25.8" r="3.8" fill={accent} />
-        </svg>
-      );
-    case 'Debian':
-      return (
-        <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
-          <path
-            d="M 19 28 C 12 28 8 22 8 16 C 8 9 14 6 21 6 C 28 6 32 11 32 18 C 32 24 27 27 22 27 C 17 27 15 23 16 19 C 17 16 20 16 20 18"
-            stroke={accent}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            fill="none"
-          />
-        </svg>
-      );
-    case 'Arch Linux':
-      return (
-        <svg width="38" height="38" viewBox="0 0 38 38">
-          <polygon points="19,4 34,34 19,28 4,34" fill={accent} />
-        </svg>
-      );
-    case 'Fedora':
-      return (
-        <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
-          <path
-            d="M 11 19 H 23 M 16 29 V 17 C 16 13 19 10 23 10"
-            stroke={accent}
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 23 10 C 28.5 10 32 14 32 19 C 32 24.5 28 28.5 22.5 28.5 C 17 28.5 13.5 24.5 13.5 19"
-            stroke={accent}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      );
-    case 'openSUSE':
-      return (
-        <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
-          <ellipse
-            cx="19"
-            cy="19"
-            rx="9.5"
-            ry="6"
-            fill={accent}
-            transform="rotate(-15 19 19)"
-          />
-          <circle cx="10.5" cy="16" r="3.8" fill={accent} />
-          <circle cx="9.5" cy="15" r="1.2" fill={THEME.bgCard} />
-          <line x1="14" y1="13" x2="10" y2="8" stroke={accent} strokeWidth="2.2" strokeLinecap="round" />
-          <line x1="23" y1="15" x2="27" y2="10" stroke={accent} strokeWidth="2.2" strokeLinecap="round" />
-          <line x1="15" y1="25" x2="11" y2="30" stroke={accent} strokeWidth="2.2" strokeLinecap="round" />
-          <line x1="24" y1="24" x2="28" y2="29" stroke={accent} strokeWidth="2.2" strokeLinecap="round" />
-          <path d="M 27 21 C 31 23 32 27 30 30" stroke={accent} strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      );
-    case 'Manjaro':
-      return (
-        <svg width="38" height="38" viewBox="0 0 38 38">
-          <rect x="7" y="6" width="6" height="26" rx="1.5" fill={accent} />
-          <rect x="16" y="14" width="6" height="18" rx="1.5" fill={accent} />
-          <rect x="25" y="8" width="6" height="24" rx="1.5" fill={accent} />
-        </svg>
-      );
-    case 'Linux Mint':
-      return (
-        <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
-          <path
-            d="M 19 5 C 10 10 7 21 12 28 C 17 33 26 32 30 25 C 33 18 29 8 19 5 Z"
-            fill={accent}
-          />
-          <path
-            d="M 19 7 C 19 16 16 23 12 28"
-            stroke={THEME.bgCard}
-            strokeWidth="2.2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 17 15 Q 22 13 25 17"
-            stroke={THEME.bgCard}
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          />
-        </svg>
-      );
-    case 'Pop!_OS':
-      return (
-        <svg width="38" height="38" viewBox="0 0 38 38">
-          <circle cx="19" cy="19" r="14" stroke={accent} strokeWidth="2.5" fill="none" />
-          <text
-            x="19"
-            y="25.5"
-            textAnchor="middle"
-            fill={accent}
-            fontSize="20"
-            fontWeight="900"
-            fontFamily="sans-serif"
-          >
-            !
-          </text>
-        </svg>
-      );
-    default:
-      return null;
-  }
-}
 
 export default function HeroSection() {
   const [hoveredDistro, setHoveredDistro] = useState(null);
@@ -330,13 +222,17 @@ export default function HeroSection() {
 
   const activeDistro = DISTROS.find((d) => d.name === hoveredDistro);
   const activePos = activeDistro ? getNodePosition(activeDistro.angle, 320, 200) : { x: 0, y: 0 };
-  const cardX = activePos.x > 0 ? activePos.x + 110 : activePos.x - 110;
-  const cardY = activePos.y;
+  // Push preview card outward along the distro's own radial direction so it
+  // never overlaps the orbital ring or adjacent nodes.
+  const activeAngleRad = activeDistro ? (activeDistro.angle * Math.PI) / 180 : 0;
+  const CARD_PUSH = 195; // px beyond the node position
+  const cardX = activePos.x + Math.cos(activeAngleRad) * CARD_PUSH;
+  const cardY = activePos.y + Math.sin(activeAngleRad) * CARD_PUSH;
 
   return (
     <div
       style={{
-        background: THEME.bg,
+        backgroundColor: 'transparent',
         minHeight: '100vh',
         position: 'relative',
         overflow: 'hidden',
@@ -351,11 +247,11 @@ export default function HeroSection() {
         }
       `}</style>
 
-      {/* Background Texture with 70 static dots */}
+      {/* Subtle vignette overlay on top of the texture */}
       <div
         className="inset-0 pointer-events-none absolute z-0"
         style={{
-          background: `radial-gradient(ellipse 75% 65% at 50% 50%, ${THEME.bgCard} 0%, ${THEME.bg} 100%)`,
+          background: 'radial-gradient(ellipse 85% 75% at 50% 50%, rgba(28, 34, 41, 0.15) 0%, rgba(16, 20, 26, 0.6) 100%)',
         }}
       >
         {STATIC_DOTS.map((dot, idx) => (
@@ -375,40 +271,115 @@ export default function HeroSection() {
         ))}
       </div>
 
-      {/* Zone 1 — Navbar Strip */}
-      <div className="flex-none">
-        <Navbar
-          isBlurred={false}
-          className="bg-transparent border-none"
-          style={{ zIndex: 10 }}
+      {/* Zone 1 — Pill Frosted Glass Navbar (fixed so backdrop-filter works) */}
+      <div style={{ height: '80px', flexShrink: 0 }} />{/* spacer so content isn't hidden under fixed bar */}
+      <nav
+        style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          display: 'inline-flex',
+          alignItems: 'center',
+          borderRadius: '9999px',
+          padding: '7px 8px 7px 18px',
+          /* frosted glass core */
+          background: 'rgba(15, 18, 24, 0.45)',
+          backdropFilter: 'blur(24px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(160%)',
+          /* borders & glow */
+          border: '1px solid rgba(255, 255, 255, 0.13)',
+          boxShadow:
+            '0 8px 32px rgba(0,0,0,0.45), 0 1.5px 0 0 rgba(255,255,255,0.14) inset, 0 0 0 1px rgba(255,255,255,0.04) inset',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {/* Brand */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            paddingRight: '18px',
+            marginRight: '4px',
+            borderRight: '1px solid rgba(255,255,255,0.1)',
+          }}
         >
-          <NavbarBrand>
-            <span style={{ color: THEME.textMain, fontFamily: 'monospace', fontSize: '1.2rem' }}>
-              Distro
-            </span>
-            <span style={{ color: THEME.accent, fontFamily: 'monospace', fontSize: '1.2rem' }}>
-              Pedia
-            </span>
-          </NavbarBrand>
-          <NavbarContent justify="end">
-            {['Distros', 'Docs', 'Community', 'AI Chat'].map((item) => (
-              <NavbarItem key={item}>
-                <a
-                  href="#"
-                  onMouseEnter={() => setHoveredNav(item)}
-                  onMouseLeave={() => setHoveredNav(null)}
-                  className="font-mono text-sm transition-colors duration-200"
-                  style={{
-                    color: hoveredNav === item ? THEME.textMain : THEME.textMuted,
-                  }}
-                >
-                  {item}
-                </a>
-              </NavbarItem>
-            ))}
-          </NavbarContent>
-        </Navbar>
-      </div>
+          <span
+            style={{
+              color: THEME.textMain,
+              fontFamily: 'monospace',
+              fontSize: '1rem',
+              fontWeight: 700,
+              letterSpacing: '0.03em',
+            }}
+          >
+            Distro
+          </span>
+          <span
+            style={{
+              color: THEME.accent,
+              fontFamily: 'monospace',
+              fontSize: '1rem',
+              fontWeight: 700,
+            }}
+          >
+            Pedia
+          </span>
+        </div>
+
+        {/* Nav links */}
+        {['Distros', 'Docs', 'Community', 'AI Chat'].map((item) => (
+          <a
+            key={item}
+            href="#"
+            onMouseEnter={() => setHoveredNav(item)}
+            onMouseLeave={() => setHoveredNav(null)}
+            style={{
+              fontFamily: 'monospace',
+              fontSize: '0.83rem',
+              color: hoveredNav === item ? THEME.textMain : THEME.textMuted,
+              textDecoration: 'none',
+              padding: '7px 15px',
+              borderRadius: '9999px',
+              transition: 'background 0.18s ease, color 0.18s ease',
+              background: hoveredNav === item
+                ? 'rgba(255,255,255,0.09)'
+                : 'transparent',
+            }}
+          >
+            {item}
+          </a>
+        ))}
+
+        {/* CTA */}
+        <button
+          style={{
+            marginLeft: '8px',
+            fontFamily: 'monospace',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            color: '#fff',
+            background: `linear-gradient(135deg, ${THEME.accent} 0%, #b83d25 100%)`,
+            border: 'none',
+            borderRadius: '9999px',
+            padding: '8px 20px',
+            cursor: 'pointer',
+            boxShadow: `0 2px 14px ${THEME.accent}66`,
+            transition: 'transform 0.16s ease, box-shadow 0.16s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.boxShadow = `0 4px 20px ${THEME.accent}88`;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = `0 2px 14px ${THEME.accent}66`;
+          }}
+        >
+          Get Started
+        </button>
+      </nav>
 
       {/* Zone 2 — Canvas Zone */}
       <div
@@ -429,7 +400,7 @@ export default function HeroSection() {
             zIndex: 1,
           }}
         >
-          {DISTROS.map((distro) => {
+          {DISTROS.map((distro, idx) => {
             const pos = getNodePosition(distro.angle, 320, 200);
             const isHovered = hoveredDistro === distro.name;
             const strokeColor = isHovered ? distro.accent : THEME.textMuted;
@@ -438,16 +409,27 @@ export default function HeroSection() {
 
             return (
               <React.Fragment key={distro.name}>
-                <line
+                <motion.line
                   x1={svgCenter.x}
                   y1={svgCenter.y}
-                  x2={svgCenter.x + pos.x}
-                  y2={svgCenter.y + pos.y}
+                  initial={{
+                    x2: svgCenter.x,
+                    y2: svgCenter.y,
+                    opacity: 0,
+                  }}
+                  animate={{
+                    x2: svgCenter.x + pos.x,
+                    y2: svgCenter.y + pos.y,
+                    opacity: opacity,
+                  }}
+                  transition={{
+                    duration: 1.15,
+                    delay: 0.3 + idx * 0.07,
+                    ease: [0.16, 1, 0.3, 1],
+                  }}
                   stroke={strokeColor}
                   strokeWidth={strokeWidth}
-                  opacity={opacity}
                   strokeDasharray="5 7"
-                  style={{ transition: 'all 0.25s ease' }}
                 />
                 {isHovered && (
                   <g transform={`translate(${svgCenter.x}, ${svgCenter.y})`}>
@@ -483,58 +465,79 @@ export default function HeroSection() {
         </div>
 
         {/* Child C — Distro Nodes (z-index: 2) — Desktop */}
-        {DISTROS.map((distro) => {
+        {DISTROS.map((distro, idx) => {
           const pos = getNodePosition(distro.angle, 320, 200);
           const isHovered = hoveredDistro === distro.name;
 
           return (
             <div
               key={distro.name}
-              className="hidden md:flex flex-col items-center"
+              className="hidden md:block pointer-events-none"
               style={{
                 position: 'absolute',
-                left: `calc(50% + ${pos.x}px)`,
-                top: `calc(50% + ${pos.y}px)`,
+                left: '50%',
+                top: '50%',
                 transform: 'translate(-50%, -50%)',
-                zIndex: 2,
+                zIndex: isHovered ? 10 : 2,
               }}
-              onMouseEnter={() => setHoveredDistro(distro.name)}
-              onMouseLeave={() => setHoveredDistro(null)}
             >
-              {/* 1. Node circle — HeroUI Card */}
-              <Card
-                isPressable={false}
-                className="cursor-default"
-                style={{
-                  width: '72px',
-                  height: '72px',
-                  borderRadius: '50%',
-                  background: THEME.bgCard,
-                  border: `2px solid ${distro.accent}${isHovered ? 'ff' : '55'}`,
-                  boxShadow: isHovered ? `0 0 20px ${distro.accent}44` : 'none',
-                  transition: 'all 0.25s ease',
-                  transform: isHovered ? 'scale(1.12)' : 'scale(1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+              <motion.div
+                initial={{
+                  x: 0,
+                  y: 0,
+                  scale: 0.15,
+                  opacity: 0,
                 }}
+                animate={{
+                  x: pos.x,
+                  y: pos.y,
+                  scale: 1,
+                  opacity: 1,
+                }}
+                transition={{
+                  duration: 1.15,
+                  delay: 0.3 + idx * 0.07,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+                className="flex flex-col items-center pointer-events-auto"
+                onMouseEnter={() => setHoveredDistro(distro.name)}
+                onMouseLeave={() => setHoveredDistro(null)}
               >
-                <DistroIcon name={distro.name} accent={distro.accent} />
-              </Card>
+                {/* 1. Node circle — HeroUI Card */}
+                <Card
+                  isPressable={false}
+                  className="cursor-default"
+                  style={{
+                    width: '72px',
+                    height: '72px',
+                    borderRadius: '50%',
+                    background: THEME.bgCard,
+                    border: `2px solid ${distro.accent}${isHovered ? 'ff' : '55'}`,
+                    boxShadow: isHovered ? `0 0 20px ${distro.accent}44` : 'none',
+                    transition: 'all 0.25s ease',
+                    transform: isHovered ? 'scale(1.12)' : 'scale(1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <DistroIcon name={distro.name} accent={distro.accent} />
+                </Card>
 
-              {/* 2. Distro label */}
-              <p
-                style={{
-                  color: THEME.textMuted,
-                  fontFamily: 'monospace',
-                  fontSize: '0.7rem',
-                  textAlign: 'center',
-                  marginTop: '8px',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {distro.name}
-              </p>
+                {/* 2. Distro label */}
+                <p
+                  style={{
+                    color: THEME.textMuted,
+                    fontFamily: 'monospace',
+                    fontSize: '0.7rem',
+                    textAlign: 'center',
+                    marginTop: '8px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {distro.name}
+                </p>
+              </motion.div>
             </div>
           );
         })}
@@ -545,99 +548,72 @@ export default function HeroSection() {
             <motion.div
               key={`desktop-preview-${activeDistro.name}`}
               className="hidden md:block"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, scale: 0.88, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.88, y: 12 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
               style={{
                 position: 'absolute',
                 left: `calc(50% + ${cardX}px)`,
                 top: `calc(50% + ${cardY}px)`,
                 transform: 'translate(-50%, -50%)',
-                width: '260px',
+                width: '300px',
                 zIndex: 10,
                 pointerEvents: 'none',
               }}
             >
-              <Card
+              {/* Distro name label */}
+              <div
                 style={{
-                  background: THEME.bgCard,
-                  border: `1px solid ${activeDistro.accent}33`,
-                  borderRadius: '12px',
-                  padding: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '8px',
+                  paddingLeft: '2px',
                 }}
               >
-                <p
+                <DistroIcon name={activeDistro.name} accent={activeDistro.accent} size={18} />
+                <span
                   style={{
                     fontFamily: 'monospace',
                     fontWeight: 700,
-                    fontSize: '1rem',
+                    fontSize: '0.9rem',
                     color: THEME.textMain,
-                    marginBottom: '4px',
+                    letterSpacing: '0.03em',
                   }}
                 >
                   {activeDistro.name}
-                </p>
-                <p
+                </span>
+              </div>
+
+              {/* Screenshot preview */}
+              <div
+                style={{
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  border: `2px solid ${activeDistro.accent}66`,
+                  boxShadow: `0 8px 32px ${activeDistro.accent}33, 0 0 0 1px ${activeDistro.accent}22`,
+                  aspectRatio: '16/10',
+                  background: THEME.bgCard,
+                }}
+              >
+                <img
+                  src={activeDistro.preview}
+                  alt={`${activeDistro.name} desktop preview`}
                   style={{
-                    fontFamily: 'monospace',
-                    fontSize: '0.7rem',
-                    color: THEME.textMuted,
-                    marginBottom: '14px',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: 'block',
                   }}
-                >
-                  {activeDistro.tagline}
-                </p>
-                <div className="flex gap-2 flex-wrap">
-                  <Chip
-                    size="sm"
-                    variant="flat"
-                    style={{
-                      background: THEME.bg,
-                      fontFamily: 'monospace',
-                      fontSize: '0.65rem',
-                      color: THEME.textMain,
-                    }}
-                  >
-                    Based on: {activeDistro.basedOn}
-                  </Chip>
-                  <Chip
-                    size="sm"
-                    variant="flat"
-                    style={{
-                      background: THEME.bg,
-                      fontFamily: 'monospace',
-                      fontSize: '0.65rem',
-                      color: THEME.textMain,
-                    }}
-                  >
-                    Init: {activeDistro.init}
-                  </Chip>
-                  <Chip
-                    size="sm"
-                    variant="flat"
-                    style={{
-                      background: THEME.bg,
-                      fontFamily: 'monospace',
-                      fontSize: '0.65rem',
-                      color: THEME.textMain,
-                    }}
-                  >
-                    pkg: {activeDistro.pkgMgr}
-                  </Chip>
-                </div>
-                <hr style={{ borderColor: '#8B949E22', margin: '12px 0' }} />
-                <p
-                  style={{
-                    textAlign: 'right',
-                    fontFamily: 'monospace',
-                    fontSize: '0.8rem',
-                    color: activeDistro.accent,
+                  onError={(e) => {
+                    // Fallback: show a gradient placeholder if image fails
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement.style.background =
+                      `linear-gradient(135deg, ${activeDistro.accent}22, ${activeDistro.accent}08)`;
                   }}
-                >
-                  Explore →
-                </p>
-              </Card>
+                />
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -655,25 +631,36 @@ export default function HeroSection() {
 
           {/* Horizontally scrollable chip row */}
           <div className="flex gap-3 overflow-x-auto px-6 py-4 md:hidden w-full max-w-full justify-start sm:justify-center items-center">
-            {DISTROS.map((distro) => {
+            {DISTROS.map((distro, idx) => {
               const isSelected = hoveredDistro === distro.name;
               return (
-                <Chip
+                <motion.div
                   key={distro.name}
-                  variant="bordered"
-                  onClick={() => setHoveredDistro(distro.name)}
-                  style={{
-                    borderColor: distro.accent,
-                    color: THEME.textMain,
-                    fontFamily: 'monospace',
-                    fontSize: '0.75rem',
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                    background: isSelected ? `${distro.accent}22` : 'transparent',
+                  initial={{ y: -25, opacity: 0, scale: 0.6 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  transition={{
+                    duration: 0.6,
+                    delay: 0.35 + idx * 0.06,
+                    ease: [0.16, 1, 0.3, 1],
                   }}
+                  className="flex-shrink-0"
                 >
-                  {distro.name}
-                </Chip>
+                  <Chip
+                    variant="bordered"
+                    onClick={() => setHoveredDistro(distro.name)}
+                    style={{
+                      borderColor: distro.accent,
+                      color: THEME.textMain,
+                      fontFamily: 'monospace',
+                      fontSize: '0.75rem',
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                      background: isSelected ? `${distro.accent}22` : 'transparent',
+                    }}
+                  >
+                    {distro.name}
+                  </Chip>
+                </motion.div>
               );
             })}
           </div>
@@ -707,17 +694,20 @@ export default function HeroSection() {
                   boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.7)',
                 }}
               >
-                <div className="flex justify-between items-start mb-1">
-                  <p
-                    style={{
-                      fontFamily: 'monospace',
-                      fontWeight: 700,
-                      fontSize: '1.05rem',
-                      color: THEME.textMain,
-                    }}
-                  >
-                    {activeDistro.name}
-                  </p>
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <DistroIcon name={activeDistro.name} accent={activeDistro.accent} size={24} />
+                    <p
+                      style={{
+                        fontFamily: 'monospace',
+                        fontWeight: 700,
+                        fontSize: '1.05rem',
+                        color: THEME.textMain,
+                      }}
+                    >
+                      {activeDistro.name}
+                    </p>
+                  </div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

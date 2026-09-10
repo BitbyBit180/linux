@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { RotateCcw, Hand } from 'lucide-react';
 
 /**
  * Interactive 3D Tux Canvas using Three.js
@@ -47,27 +46,52 @@ export default function Tux3DCanvas({
     isPointerDown: false,
     clickStartTime: 0,
     pointerDownPos: { x: 0, y: 0 },
-    spinProgress: 0,
-    isSpinning: false,
-    initialCamPos: new THREE.Vector3(0, 0.4, 3.8),
+    isResetting: false,
+    resetProgress: 0,
+    resetDuration: 0.7,
+    startSpherical: new THREE.Spherical(),
+    targetSpherical: new THREE.Spherical(),
+    dRadius: 0,
+    dPhi: 0,
+    dTheta: 0,
+    startMouseX: 0,
+    startMouseY: 0,
+    initialCamPos: new THREE.Vector3(0, 0.35, 3.8),
     initialTarget: new THREE.Vector3(0, 0, 0),
   });
 
-  // Handle click / tap on Tux for joyful spin
-  const triggerJoyfulSpin = useCallback(() => {
-    stateRef.current.isSpinning = true;
-    stateRef.current.spinProgress = 0;
-  }, []);
-
-  // Reset camera to default view
-  const handleResetCamera = useCallback((e) => {
-    e?.stopPropagation();
+  // Return Tux and camera in a single, ultra-smooth spherical turning motion
+  const resetToOriginalPosition = useCallback(() => {
     if (controlsRef.current && cameraRef.current) {
-      const initPos = stateRef.current.initialCamPos;
-      const initTarget = stateRef.current.initialTarget;
-      cameraRef.current.position.copy(initPos);
-      controlsRef.current.target.copy(initTarget);
-      controlsRef.current.update();
+      const state = stateRef.current;
+      const camera = cameraRef.current;
+
+      // Extract spherical coordinates relative to the target center
+      const offset = new THREE.Vector3().copy(camera.position).sub(controlsRef.current.target);
+      state.startSpherical.setFromVector3(offset);
+
+      const targetOffset = new THREE.Vector3().copy(state.initialCamPos).sub(state.initialTarget);
+      state.targetSpherical.setFromVector3(targetOffset);
+
+      // Shortest angular turn along the horizontal circle (theta)
+      let dTheta = (state.targetSpherical.theta - state.startSpherical.theta) % (Math.PI * 2);
+      if (dTheta > Math.PI) dTheta -= Math.PI * 2;
+      if (dTheta < -Math.PI) dTheta += Math.PI * 2;
+      state.dTheta = dTheta;
+
+      // Polar elevation difference
+      state.dPhi = state.targetSpherical.phi - state.startSpherical.phi;
+
+      // Distance difference
+      state.dRadius = state.targetSpherical.radius - state.startSpherical.radius;
+
+      state.startMouseX = state.currentMouseX;
+      state.startMouseY = state.currentMouseY;
+      state.targetMouseX = 0;
+      state.targetMouseY = 0;
+
+      state.isResetting = true;
+      state.resetProgress = 0;
       setHasInteracted(false);
     }
   }, []);
@@ -128,6 +152,7 @@ export default function Tux3DCanvas({
       controls.addEventListener('start', () => {
         setHasInteracted(true);
         stateRef.current.isPointerDown = true;
+        stateRef.current.isResetting = false;
       });
       controls.addEventListener('end', () => {
         stateRef.current.isPointerDown = false;
@@ -226,35 +251,58 @@ export default function Tux3DCanvas({
 
         const delta = clock.getDelta();
         const elapsedTime = clock.getElapsedTime();
+        const state = stateRef.current;
 
-        controls.update();
+        // Ultra-smooth single-motion turn back to original position
+        if (state.isResetting) {
+          state.resetProgress += delta / state.resetDuration;
+          const t = Math.min(1, state.resetProgress);
+
+          // Silky smooth easeInOutCubic: gentle acceleration and deceleration
+          const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+          // Interpolate along the spherical orbit at constant radius (no dipping/zooming)
+          const curRadius = state.startSpherical.radius + state.dRadius * ease;
+          const curPhi = state.startSpherical.phi + state.dPhi * ease;
+          const curTheta = state.startSpherical.theta + state.dTheta * ease;
+
+          const currentSpherical = new THREE.Spherical(curRadius, curPhi, curTheta);
+          camera.position.setFromSpherical(currentSpherical);
+          controls.target.set(0, 0, 0);
+          controls.update();
+
+          // Sync mouse parallax easing seamlessly with the turn
+          state.currentMouseX = state.startMouseX * (1 - ease);
+          state.currentMouseY = state.startMouseY * (1 - ease);
+
+          if (t >= 1) {
+            state.isResetting = false;
+            camera.position.copy(state.initialCamPos);
+            controls.target.copy(state.initialTarget);
+            controls.update();
+            state.currentMouseX = 0;
+            state.currentMouseY = 0;
+          }
+        } else {
+          controls.update();
+        }
 
         if (pivotGroup) {
           // 1. Idle Floating & Breathing
           const floatY = Math.sin(elapsedTime * 2.2) * 0.06;
           const tiltZ = Math.sin(elapsedTime * 1.4) * 0.02;
 
-          // 2. Click Spin Animation
-          if (stateRef.current.isSpinning) {
-            stateRef.current.spinProgress += delta * 6.0;
-            if (stateRef.current.spinProgress >= Math.PI * 2) {
-              stateRef.current.spinProgress = 0;
-              stateRef.current.isSpinning = false;
-            }
-          }
-
-          // 3. Mouse Parallax (when not dragging)
-          const state = stateRef.current;
-          if (!state.isPointerDown) {
+          // 2. Mouse Parallax (when not dragging or resetting)
+          if (!state.isPointerDown && !state.isResetting) {
             state.currentMouseX += (state.targetMouseX - state.currentMouseX) * 0.06;
             state.currentMouseY += (state.targetMouseY - state.currentMouseY) * 0.06;
           }
 
-          // Apply combined transformations to pivotGroup
-          pivotGroup.position.y = floatY + Math.sin(state.spinProgress) * 0.15;
+          // Apply clean transformations to pivotGroup (one unified, pure motion)
+          pivotGroup.position.y = floatY;
           pivotGroup.rotation.z = tiltZ;
           pivotGroup.rotation.x = state.currentMouseY * 0.25;
-          pivotGroup.rotation.y = state.currentMouseX * 0.4 + state.spinProgress;
+          pivotGroup.rotation.y = state.currentMouseX * 0.4;
         }
 
         renderer.render(scene, camera);
@@ -305,9 +353,9 @@ export default function Tux3DCanvas({
     const elapsed = Date.now() - stateRef.current.clickStartTime;
     const dx = Math.abs(e.clientX - stateRef.current.pointerDownPos.x);
     const dy = Math.abs(e.clientY - stateRef.current.pointerDownPos.y);
-    // If it was a quick click without dragging, do the happy spin!
-    if (elapsed < 300 && dx < 6 && dy < 6) {
-      triggerJoyfulSpin();
+    // If it was a click/tap on the model without dragging, return to original position!
+    if (elapsed < 350 && dx < 8 && dy < 8) {
+      resetToOriginalPosition();
     }
   };
 
@@ -382,30 +430,7 @@ export default function Tux3DCanvas({
         style={{ touchAction: 'none' }}
       />
 
-      {/* Interactive Helper Hint Badge */}
-      {!isLoading && !loadError && (
-        <div
-          className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono tracking-tight text-white/80 pointer-events-auto shadow-lg backdrop-blur-md transition-all duration-300 border border-white/10 whitespace-nowrap"
-          style={{
-            backgroundColor: '#1C2229CC',
-            borderColor: `${accentColor}40`,
-          }}
-        >
-          <Hand className="w-3 h-3 text-[#E8A27C] animate-pulse" />
-          <span>3D Tux • Drag to rotate</span>
 
-          {hasInteracted && (
-            <button
-              onClick={handleResetCamera}
-              className="ml-1 p-0.5 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-              title="Reset 3D camera"
-              aria-label="Reset camera"
-            >
-              <RotateCcw className="w-2.5 h-2.5" />
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
