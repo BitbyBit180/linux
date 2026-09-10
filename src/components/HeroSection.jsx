@@ -530,9 +530,7 @@ export default function HeroSection() {
                     borderRadius: isHovered ? '12px' : '50%',
                     overflow: 'hidden',
                     border: `2px solid ${distro.accent}${isHovered ? 'cc' : '55'}`,
-                    boxShadow: isHovered
-                      ? `0 12px 40px ${distro.accent}55, 0 0 0 1px ${distro.accent}33`
-                      : 'none',
+                    boxShadow: 'none',
                     transition: 'width 0.3s cubic-bezier(0.16,1,0.3,1), height 0.3s cubic-bezier(0.16,1,0.3,1), border-radius 0.3s ease, border-color 0.25s ease, box-shadow 0.25s ease',
                     background: THEME.bgCard,
                     flexShrink: 0,
