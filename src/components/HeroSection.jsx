@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Navbar, NavbarBrand, NavbarContent, NavbarItem, Card, Chip, Button } from '@heroui/react';
+import { Card, Chip, Button } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import Tux3DCanvas from './Tux3DCanvas.jsx';
 import DistroIcon from './DistroIcon.jsx';
+import Navbar from './Navbar.jsx';
 import { THEME } from '../designTokens.js';
 
 // Distro Data
@@ -182,9 +183,8 @@ const STATIC_DOTS = [
 ];
 
 
-export default function HeroSection() {
+export default function HeroSection({ onNavigate }) {
   const [hoveredDistro, setHoveredDistro] = useState(null);
-  const [hoveredNav, setHoveredNav] = useState(null);
   const svgRef = useRef(null);
   const [svgCenter, setSvgCenter] = useState({ x: 0, y: 0 });
 
@@ -271,126 +271,7 @@ export default function HeroSection() {
 
       {/* Zone 1 — Light Glassmorphism Navbar */}
       <div style={{ height: '80px', flexShrink: 0 }} />
-      <nav
-        style={{
-          position: 'fixed',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 100,
-          display: 'inline-flex',
-          alignItems: 'center',
-          borderRadius: '9999px',
-          padding: '6px 8px 6px 6px',
-          /* Light milky glass — matches reference */
-          background: 'rgba(255, 255, 255, 0.12)',
-          backdropFilter: 'blur(32px) saturate(180%) brightness(1.15)',
-          WebkitBackdropFilter: 'blur(32px) saturate(180%) brightness(1.15)',
-          /* Subtle white border + top sheen */
-          border: '1px solid rgba(255, 255, 255, 0.28)',
-          boxShadow:
-            '0 2px 24px rgba(0, 0, 0, 0.18), 0 1px 0 rgba(255,255,255,0.55) inset',
-          whiteSpace: 'nowrap',
-          gap: '2px',
-        }}
-      >
-        {/* Brand pill */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1px',
-            padding: '7px 16px 7px 12px',
-            borderRadius: '9999px',
-            marginRight: '2px',
-            background: 'rgba(255,255,255,0.15)',
-            border: '1px solid rgba(255,255,255,0.22)',
-            boxShadow: '0 1px 0 rgba(255,255,255,0.4) inset',
-          }}
-        >
-          <span
-            style={{
-              color: '#fff',
-              fontFamily: 'monospace',
-              fontSize: '0.95rem',
-              fontWeight: 800,
-              letterSpacing: '0.04em',
-              textShadow: '0 1px 8px rgba(0,0,0,0.35)',
-            }}
-          >
-            Distro
-          </span>
-          <span
-            style={{
-              color: THEME.accent,
-              fontFamily: 'monospace',
-              fontSize: '0.95rem',
-              fontWeight: 800,
-              textShadow: `0 1px 8px ${THEME.accent}88`,
-            }}
-          >
-            Pedia
-          </span>
-        </div>
-
-        {/* Nav links */}
-        {['Distros', 'Docs', 'Community', 'AI Chat'].map((item) => (
-          <a
-            key={item}
-            href="#"
-            onMouseEnter={() => setHoveredNav(item)}
-            onMouseLeave={() => setHoveredNav(null)}
-            style={{
-              fontFamily: 'monospace',
-              fontSize: '0.82rem',
-              fontWeight: 500,
-              color: hoveredNav === item ? '#ffffff' : 'rgba(255,255,255,0.65)',
-              textDecoration: 'none',
-              padding: '7px 16px',
-              borderRadius: '9999px',
-              transition: 'background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease',
-              background: hoveredNav === item
-                ? 'rgba(255,255,255,0.18)'
-                : 'transparent',
-              boxShadow: hoveredNav === item
-                ? '0 1px 0 rgba(255,255,255,0.45) inset, 0 1px 6px rgba(0,0,0,0.12)'
-                : 'none',
-              letterSpacing: '0.02em',
-            }}
-          >
-            {item}
-          </a>
-        ))}
-
-        {/* CTA — glass pill button */}
-        <button
-          style={{
-            marginLeft: '4px',
-            fontFamily: 'monospace',
-            fontSize: '0.8rem',
-            fontWeight: 700,
-            color: '#fff',
-            background: `linear-gradient(135deg, ${THEME.accent} 0%, #b83d25 100%)`,
-            border: '1px solid rgba(255,255,255,0.25)',
-            borderRadius: '9999px',
-            padding: '8px 20px',
-            cursor: 'pointer',
-            boxShadow: `0 2px 16px ${THEME.accent}55, 0 1px 0 rgba(255,255,255,0.35) inset`,
-            transition: 'transform 0.16s ease, box-shadow 0.16s ease',
-            letterSpacing: '0.03em',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)';
-            e.currentTarget.style.boxShadow = `0 4px 22px ${THEME.accent}88, 0 1px 0 rgba(255,255,255,0.35) inset`;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = `0 2px 16px ${THEME.accent}55, 0 1px 0 rgba(255,255,255,0.35) inset`;
-          }}
-        >
-          Get Started
-        </button>
-      </nav>
+      <Navbar currentRoute="/" onNavigate={onNavigate} />
 
       {/* Zone 2 — Canvas Zone */}
       <div
