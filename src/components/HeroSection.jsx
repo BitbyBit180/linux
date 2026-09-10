@@ -26,7 +26,8 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'apt',
     angle: -90,
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Ubuntu_24.04_LTS_Desktop.png/1280px-Ubuntu_24.04_LTS_Desktop.png',
+    // Ubuntu 24.04 LTS default desktop — verified ✓
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/a/ad/Ubuntu_24.04_LTS_default_desktop_-_English.png',
   },
   {
     name: 'Debian',
@@ -36,7 +37,8 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'apt',
     angle: -45,
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Debian_12_%22Bookworm%22_-_GNOME_Desktop.png/1280px-Debian_12_%22Bookworm%22_-_GNOME_Desktop.png',
+    // Debian 12 Bookworm GNOME — verified ✓
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/f/fc/Debian_12_Bookworm_GNOME_Desktop_English.png',
   },
   {
     name: 'Arch Linux',
@@ -46,7 +48,8 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'pacman',
     angle: 0,
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Arch_linux_2022_screenshot.png/1280px-Arch_linux_2022_screenshot.png',
+    // Arch Linux with KDE — verified ✓
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/7/7a/Arch_Linux_with_KDE.png',
   },
   {
     name: 'Fedora',
@@ -56,7 +59,8 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'dnf',
     angle: 45,
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/Fedora_40_Desktop.png/1280px-Fedora_40_Desktop.png',
+    // Fedora Workstation 40 GNOME — verified ✓
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/8/82/Fedora_Workstation_40.png',
   },
   {
     name: 'openSUSE',
@@ -66,7 +70,8 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'zypper',
     angle: 90,
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/OpenSUSE_Leap_15.6_-_GNOME.png/1280px-OpenSUSE_Leap_15.6_-_GNOME.png',
+    // KDE Plasma 6 on openSUSE dark mode — verified ✓
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/e/e2/KDE_Plasma_6_screenshot_%28openSUSE_dark_mode%29.png',
   },
   {
     name: 'Manjaro',
@@ -76,7 +81,8 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'pacman',
     angle: 135,
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Manjaro-Linux-22.1.3-GNOME.png/1280px-Manjaro-Linux-22.1.3-GNOME.png',
+    // Manjaro Linux 24.0 KDE Plasma 6 — verified ✓
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/3/30/Manjaro_Linux_24.0_KDE_Plasma_Desktop_English.png',
   },
   {
     name: 'Linux Mint',
@@ -86,7 +92,8 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'apt',
     angle: 180,
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Linux_Mint_21.3_Cinnamon.png/1280px-Linux_Mint_21.3_Cinnamon.png',
+    // Linux Mint 21 Cinnamon — verified ✓
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/f/f9/Linux_Mint_21_Cinnamon_eng.png',
   },
   {
     name: 'Pop!_OS',
@@ -96,7 +103,8 @@ const DISTROS = [
     init: 'systemd',
     pkgMgr: 'apt',
     angle: 225,
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Pop_os-22.04-Desktop.png/1280px-Pop_os-22.04-Desktop.png',
+    // Pop!_OS 22.04 LTS COSMIC — verified ✓
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/0/01/Pop%21_OS_22.04_LTS_alternate_COSMIC_wallpaper_-_English.png',
   },
 ];
 
@@ -222,12 +230,9 @@ export default function HeroSection() {
 
   const activeDistro = DISTROS.find((d) => d.name === hoveredDistro);
   const activePos = activeDistro ? getNodePosition(activeDistro.angle, 320, 200) : { x: 0, y: 0 };
-  // Push preview card outward along the distro's own radial direction so it
-  // never overlaps the orbital ring or adjacent nodes.
-  const activeAngleRad = activeDistro ? (activeDistro.angle * Math.PI) / 180 : 0;
-  const CARD_PUSH = 195; // px beyond the node position
-  const cardX = activePos.x + Math.cos(activeAngleRad) * CARD_PUSH;
-  const cardY = activePos.y + Math.sin(activeAngleRad) * CARD_PUSH;
+  // Center the preview card directly on top of the hovered logo node.
+  const cardX = activePos.x;
+  const cardY = activePos.y;
 
   return (
     <div
@@ -271,8 +276,8 @@ export default function HeroSection() {
         ))}
       </div>
 
-      {/* Zone 1 — Pill Frosted Glass Navbar (fixed so backdrop-filter works) */}
-      <div style={{ height: '80px', flexShrink: 0 }} />{/* spacer so content isn't hidden under fixed bar */}
+      {/* Zone 1 — Light Glassmorphism Navbar */}
+      <div style={{ height: '80px', flexShrink: 0 }} />
       <nav
         style={{
           position: 'fixed',
@@ -283,35 +288,41 @@ export default function HeroSection() {
           display: 'inline-flex',
           alignItems: 'center',
           borderRadius: '9999px',
-          padding: '7px 8px 7px 18px',
-          /* frosted glass core */
-          background: 'rgba(15, 18, 24, 0.45)',
-          backdropFilter: 'blur(24px) saturate(160%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(160%)',
-          /* borders & glow */
-          border: '1px solid rgba(255, 255, 255, 0.13)',
+          padding: '6px 8px 6px 6px',
+          /* Light milky glass — matches reference */
+          background: 'rgba(255, 255, 255, 0.12)',
+          backdropFilter: 'blur(32px) saturate(180%) brightness(1.15)',
+          WebkitBackdropFilter: 'blur(32px) saturate(180%) brightness(1.15)',
+          /* Subtle white border + top sheen */
+          border: '1px solid rgba(255, 255, 255, 0.28)',
           boxShadow:
-            '0 8px 32px rgba(0,0,0,0.45), 0 1.5px 0 0 rgba(255,255,255,0.14) inset, 0 0 0 1px rgba(255,255,255,0.04) inset',
+            '0 2px 24px rgba(0, 0, 0, 0.18), 0 1px 0 rgba(255,255,255,0.55) inset',
           whiteSpace: 'nowrap',
+          gap: '2px',
         }}
       >
-        {/* Brand */}
+        {/* Brand pill */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            paddingRight: '18px',
-            marginRight: '4px',
-            borderRight: '1px solid rgba(255,255,255,0.1)',
+            gap: '1px',
+            padding: '7px 16px 7px 12px',
+            borderRadius: '9999px',
+            marginRight: '2px',
+            background: 'rgba(255,255,255,0.15)',
+            border: '1px solid rgba(255,255,255,0.22)',
+            boxShadow: '0 1px 0 rgba(255,255,255,0.4) inset',
           }}
         >
           <span
             style={{
-              color: THEME.textMain,
+              color: '#fff',
               fontFamily: 'monospace',
-              fontSize: '1rem',
-              fontWeight: 700,
-              letterSpacing: '0.03em',
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              letterSpacing: '0.04em',
+              textShadow: '0 1px 8px rgba(0,0,0,0.35)',
             }}
           >
             Distro
@@ -320,8 +331,9 @@ export default function HeroSection() {
             style={{
               color: THEME.accent,
               fontFamily: 'monospace',
-              fontSize: '1rem',
-              fontWeight: 700,
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              textShadow: `0 1px 8px ${THEME.accent}88`,
             }}
           >
             Pedia
@@ -337,44 +349,50 @@ export default function HeroSection() {
             onMouseLeave={() => setHoveredNav(null)}
             style={{
               fontFamily: 'monospace',
-              fontSize: '0.83rem',
-              color: hoveredNav === item ? THEME.textMain : THEME.textMuted,
+              fontSize: '0.82rem',
+              fontWeight: 500,
+              color: hoveredNav === item ? '#ffffff' : 'rgba(255,255,255,0.65)',
               textDecoration: 'none',
-              padding: '7px 15px',
+              padding: '7px 16px',
               borderRadius: '9999px',
-              transition: 'background 0.18s ease, color 0.18s ease',
+              transition: 'background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease',
               background: hoveredNav === item
-                ? 'rgba(255,255,255,0.09)'
+                ? 'rgba(255,255,255,0.18)'
                 : 'transparent',
+              boxShadow: hoveredNav === item
+                ? '0 1px 0 rgba(255,255,255,0.45) inset, 0 1px 6px rgba(0,0,0,0.12)'
+                : 'none',
+              letterSpacing: '0.02em',
             }}
           >
             {item}
           </a>
         ))}
 
-        {/* CTA */}
+        {/* CTA — glass pill button */}
         <button
           style={{
-            marginLeft: '8px',
+            marginLeft: '4px',
             fontFamily: 'monospace',
             fontSize: '0.8rem',
             fontWeight: 700,
             color: '#fff',
             background: `linear-gradient(135deg, ${THEME.accent} 0%, #b83d25 100%)`,
-            border: 'none',
+            border: '1px solid rgba(255,255,255,0.25)',
             borderRadius: '9999px',
             padding: '8px 20px',
             cursor: 'pointer',
-            boxShadow: `0 2px 14px ${THEME.accent}66`,
+            boxShadow: `0 2px 16px ${THEME.accent}55, 0 1px 0 rgba(255,255,255,0.35) inset`,
             transition: 'transform 0.16s ease, box-shadow 0.16s ease',
+            letterSpacing: '0.03em',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.05)';
-            e.currentTarget.style.boxShadow = `0 4px 20px ${THEME.accent}88`;
+            e.currentTarget.style.boxShadow = `0 4px 22px ${THEME.accent}88, 0 1px 0 rgba(255,255,255,0.35) inset`;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = `0 2px 14px ${THEME.accent}66`;
+            e.currentTarget.style.boxShadow = `0 2px 16px ${THEME.accent}55, 0 1px 0 rgba(255,255,255,0.35) inset`;
           }}
         >
           Get Started
@@ -503,28 +521,68 @@ export default function HeroSection() {
                 onMouseEnter={() => setHoveredDistro(distro.name)}
                 onMouseLeave={() => setHoveredDistro(null)}
               >
-                {/* 1. Node circle — HeroUI Card */}
-                <Card
-                  isPressable={false}
-                  className="cursor-default"
+                {/* Node: crossfades between logo circle and preview screenshot */}
+                <div
                   style={{
-                    width: '72px',
-                    height: '72px',
-                    borderRadius: '50%',
+                    position: 'relative',
+                    width: isHovered ? '220px' : '72px',
+                    height: isHovered ? '138px' : '72px',
+                    borderRadius: isHovered ? '12px' : '50%',
+                    overflow: 'hidden',
+                    border: `2px solid ${distro.accent}${isHovered ? 'cc' : '55'}`,
+                    boxShadow: isHovered
+                      ? `0 12px 40px ${distro.accent}55, 0 0 0 1px ${distro.accent}33`
+                      : 'none',
+                    transition: 'width 0.3s cubic-bezier(0.16,1,0.3,1), height 0.3s cubic-bezier(0.16,1,0.3,1), border-radius 0.3s ease, border-color 0.25s ease, box-shadow 0.25s ease',
                     background: THEME.bgCard,
-                    border: `2px solid ${distro.accent}${isHovered ? 'ff' : '55'}`,
-                    boxShadow: isHovered ? `0 0 20px ${distro.accent}44` : 'none',
-                    transition: 'all 0.25s ease',
-                    transform: isHovered ? 'scale(1.12)' : 'scale(1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    flexShrink: 0,
                   }}
                 >
-                  <DistroIcon name={distro.name} accent={distro.accent} />
-                </Card>
+                  {/* Logo — hidden when hovered */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: isHovered ? 0 : 1,
+                      transition: 'opacity 0.2s ease',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <DistroIcon name={distro.name} accent={distro.accent} />
+                  </div>
 
-                {/* 2. Distro label */}
+                  {/* Preview screenshot — shown when hovered */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      opacity: isHovered ? 1 : 0,
+                      transition: 'opacity 0.25s ease',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <img
+                      src={distro.preview}
+                      alt={`${distro.name} desktop`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.parentElement.style.background =
+                          `linear-gradient(135deg, ${distro.accent}33, ${distro.accent}0a)`;
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Distro label — fades out when hovered */}
                 <p
                   style={{
                     color: THEME.textMuted,
@@ -533,6 +591,8 @@ export default function HeroSection() {
                     textAlign: 'center',
                     marginTop: '8px',
                     whiteSpace: 'nowrap',
+                    opacity: isHovered ? 0 : 1,
+                    transition: 'opacity 0.2s ease',
                   }}
                 >
                   {distro.name}
@@ -542,81 +602,6 @@ export default function HeroSection() {
           );
         })}
 
-        {/* Child D — Preview Card (z-index: 10) — Desktop */}
-        <AnimatePresence>
-          {activeDistro && (
-            <motion.div
-              key={`desktop-preview-${activeDistro.name}`}
-              className="hidden md:block"
-              initial={{ opacity: 0, scale: 0.88, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.88, y: 12 }}
-              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              style={{
-                position: 'absolute',
-                left: `calc(50% + ${cardX}px)`,
-                top: `calc(50% + ${cardY}px)`,
-                transform: 'translate(-50%, -50%)',
-                width: '300px',
-                zIndex: 10,
-                pointerEvents: 'none',
-              }}
-            >
-              {/* Distro name label */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '8px',
-                  paddingLeft: '2px',
-                }}
-              >
-                <DistroIcon name={activeDistro.name} accent={activeDistro.accent} size={18} />
-                <span
-                  style={{
-                    fontFamily: 'monospace',
-                    fontWeight: 700,
-                    fontSize: '0.9rem',
-                    color: THEME.textMain,
-                    letterSpacing: '0.03em',
-                  }}
-                >
-                  {activeDistro.name}
-                </span>
-              </div>
-
-              {/* Screenshot preview */}
-              <div
-                style={{
-                  borderRadius: '10px',
-                  overflow: 'hidden',
-                  border: `2px solid ${activeDistro.accent}66`,
-                  boxShadow: `0 8px 32px ${activeDistro.accent}33, 0 0 0 1px ${activeDistro.accent}22`,
-                  aspectRatio: '16/10',
-                  background: THEME.bgCard,
-                }}
-              >
-                <img
-                  src={activeDistro.preview}
-                  alt={`${activeDistro.name} desktop preview`}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    display: 'block',
-                  }}
-                  onError={(e) => {
-                    // Fallback: show a gradient placeholder if image fails
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.parentElement.style.background =
-                      `linear-gradient(135deg, ${activeDistro.accent}22, ${activeDistro.accent}08)`;
-                  }}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Mobile View — Below md breakpoint */}
         <div className="md:hidden flex flex-col items-center justify-center w-full min-h-[55vh] py-8 z-10 relative">
