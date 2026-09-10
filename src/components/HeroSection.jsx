@@ -4,17 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import Tux3DCanvas from './Tux3DCanvas.jsx';
 import DistroIcon from './DistroIcon.jsx';
-
-// Global Tokens
-const THEME = {
-  bg: '#161B22',
-  bgCard: '#1C2229',
-  accent: '#E05A38',
-  accentSoft: '#E8A27C',
-  silver: '#A2A8B0',
-  textMain: '#F0F4F8',
-  textMuted: '#8B949E',
-};
+import { THEME } from '../designTokens.js';
 
 // Distro Data
 const DISTROS = [
@@ -252,12 +242,15 @@ export default function HeroSection() {
         }
       `}</style>
 
-      {/* Subtle vignette overlay on top of the texture */}
+      {/* Hero CSS background (replaces bg-texture.png image) */}
+      <div className="hero-bg absolute inset-0 z-0" aria-hidden="true">
+        <div className="grain-fine" />
+        <div className="grain-fiber" />
+      </div>
+
+      {/* Static dot texture above the CSS background */}
       <div
-        className="inset-0 pointer-events-none absolute z-0"
-        style={{
-          background: 'radial-gradient(ellipse 85% 75% at 50% 50%, rgba(28, 34, 41, 0.15) 0%, rgba(16, 20, 26, 0.6) 100%)',
-        }}
+        className="inset-0 pointer-events-none absolute z-[1]"
       >
         {STATIC_DOTS.map((dot, idx) => (
           <span
