@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import connectDB from './src/config/db.js';
+import distroRoutes from './src/routes/distroRoutes.js';
 import flavourRoutes from './src/routes/flavourRoutes.js';
 import { notFound, errorHandler } from './src/middleware/errorMiddleware.js';
 
@@ -17,10 +18,11 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Linux Hub API is running', time: new Date().toISOString() });
 });
 
-// NOTE: distro detail routes (/api/distros) land in a follow-up commit.
-
-// API routes (lean catalogue for the Flavours page)
+// API routes
+// flavours -> lean catalogue for the Flavours page
+// distros  -> full detail (specs + install guides) for the Detail page
 app.use('/api/flavours', flavourRoutes);
+app.use('/api/distros', distroRoutes);
 
 // 404 + error handler (must be last)
 app.use(notFound);
