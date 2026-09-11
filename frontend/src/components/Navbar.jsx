@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, X, SlidersHorizontal } from 'lucide-react';
-import { THEME } from '../designTokens.js';
+import { THEME } from '../theme/designTokens.js';
 
 export default function Navbar({
   currentRoute = '/',

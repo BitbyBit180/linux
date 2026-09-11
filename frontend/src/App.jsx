@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import HeroSection from './components/HeroSection.jsx';
-import FlavoursPage from './components/FlavoursPage.jsx';
-import DistroDetailPage from './components/DistroDetailPage.jsx';
+import HomePage from './pages/HomePage.jsx';
+import FlavoursPage from './pages/FlavoursPage.jsx';
+import DistroDetailPage from './pages/DistroDetailPage.jsx';
 
 function normalizeRoute(pathname, hash) {
   const path = (pathname || '').toLowerCase();
@@ -55,7 +55,7 @@ export default function App() {
       ) : isFlavours ? (
         <FlavoursPage onNavigate={navigate} />
       ) : (
-        <HeroSection onNavigate={navigate} />
+        <HomePage onNavigate={navigate} />
       )}
     </div>
   );

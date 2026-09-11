@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import Tux3DCanvas from './Tux3DCanvas.jsx';
 import DistroIcon from './DistroIcon.jsx';
 import Navbar from './Navbar.jsx';
-import { THEME } from '../designTokens.js';
+import { THEME } from '../theme/designTokens.js';
 
 // Distro Data
 const DISTROS = [
