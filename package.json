@@ -2,28 +2,14 @@
   "name": "linux-distro-hub",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
+  "description": "Linux Distro Hub — MERN stack (frontend/ + backend/)",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@heroui/react": "^2.7.2",
-    "clsx": "^2.1.1",
-    "framer-motion": "^11.18.2",
-    "lucide-react": "^0.475.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "simple-icons": "^16.30.0",
-    "tailwind-merge": "^2.6.0",
-    "three": "^0.186.0"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.5.1",
-    "tailwindcss": "^3.4.17",
-    "vite": "^6.1.0"
+    "dev": "npm --prefix frontend run dev",
+    "client": "npm --prefix frontend run dev",
+    "server": "npm --prefix backend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "seed": "npm --prefix backend run seed",
+    "install:all": "npm --prefix frontend install && npm --prefix backend install"
   }
 }
