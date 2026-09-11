@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Navbar from './Navbar.jsx';
-import DistroCard from './DistroCard.jsx';
-import { DISTROS, POPULAR_DISTROS } from '../data/distros.js';
-import { THEME } from '../designTokens.js';
+import Navbar from '../components/Navbar.jsx';
+import DistroCard from '../components/DistroCard.jsx';
+import { useDistros } from '../hooks/useDistros.js';
+import { THEME } from '../theme/designTokens.js';
 
 // Static Dots texture identical to hero page
 const STATIC_DOTS = [
@@ -73,22 +73,16 @@ const STATIC_DOTS = [
   { top: '96%', left: '91%' },
 ];
 
-const CATEGORIES = [
-  'All',
-  'Debian / Ubuntu',
-  'Arch',
-  'Red Hat / Fedora',
-  'Security',
-  'Independent',
-];
-
 export default function FlavoursPage({ onNavigate }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
+  // Catalogue from the API (hook falls back to local static data offline)
+  const { distros, popularDistros, categories } = useDistros();
+
   // Filtered distros based on search and category
   const filteredAllDistros = useMemo(() => {
-    return DISTROS.filter((distro) => {
+    return distros.filter((distro) => {
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
@@ -103,18 +97,18 @@ export default function FlavoursPage({ onNavigate }) {
 
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, distros]);
 
   const filteredPopularDistros = useMemo(() => {
-    if (!searchQuery.trim()) return POPULAR_DISTROS;
+    if (!searchQuery.trim()) return popularDistros;
     const q = searchQuery.toLowerCase().trim();
-    return POPULAR_DISTROS.filter(
+    return popularDistros.filter(
       (distro) =>
         distro.name.toLowerCase().includes(q) ||
         distro.tagline.toLowerCase().includes(q) ||
         distro.basedOn.toLowerCase().includes(q)
     );
-  }, [searchQuery]);
+  }, [searchQuery, popularDistros]);
 
   return (
     <div
@@ -234,7 +228,7 @@ export default function FlavoursPage({ onNavigate }) {
 
             {/* Category Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-2 sm:pb-0 scrollbar-none">
-              {CATEGORIES.map((cat) => {
+              {categories.map((cat) => {
                 const isSelected = selectedCategory === cat;
                 return (
                   <button
