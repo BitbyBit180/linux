@@ -150,10 +150,11 @@ export default function Navbar({
           {['Compare', 'Community', 'AI Chat'].map((item) => (
             <a
               key={item}
-              href={item === 'Compare' ? '/compare' : item === 'AI Chat' ? '/chat' : '#'}
+              href={item === 'Compare' ? '/compare' : item === 'Community' ? '/community' : item === 'AI Chat' ? '/chat' : '#'}
               onClick={(e) => {
                 e.preventDefault();
                 if (item === 'Compare') onNavigate?.('/compare');
+                else if (item === 'Community') onNavigate?.('/community');
                 else if (item === 'AI Chat') onNavigate?.('/chat');
               }}
               onMouseEnter={() => setHoveredNav(item)}
@@ -186,17 +187,20 @@ export default function Navbar({
           {['Distros', 'Compare', 'Docs', 'Community', 'AI Chat'].map((item) => {
             const isDistros = item === 'Distros';
             const isCompare = item === 'Compare';
+            const isCommunity = item === 'Community';
             const isAIChat = item === 'AI Chat';
             return (
               <a
                 key={item}
-                href={isDistros ? '/flavours' : isCompare ? '/compare' : isAIChat ? '/chat' : '#'}
+                href={isDistros ? '/flavours' : isCompare ? '/compare' : isCommunity ? '/community' : isAIChat ? '/chat' : '#'}
                 onClick={(e) => {
                   e.preventDefault();
                   if (isDistros) {
                     onNavigate?.('/flavours');
                   } else if (isCompare) {
                     onNavigate?.('/compare');
+                  } else if (isCommunity) {
+                    onNavigate?.('/community');
                   } else if (isAIChat) {
                     onNavigate?.('/chat');
                   }
