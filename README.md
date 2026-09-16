@@ -96,6 +96,21 @@ In production set `VITE_API_URL=https://your-api-host/api` (in `frontend/.env`) 
 | GET | `/api/flavours/popular` | popular only |
 | GET | `/api/flavours/categories` | `["All", ...]` |
 | GET | `/api/distros/:id` | by `distroId` or name — includes full `installGuide` (Detail page) |
+| GET | `/api/distros/compare?ids=a,b,c,d` | side-by-side spec comparison (max 4, ordered) |
 | POST/PUT/DELETE | `/api/flavours...`, `/api/distros...` | admin CRUD per collection |
+
+### Auth & AI chat (JWT-protected)
+
+Set `JWT_SECRET` and `GEMINI_API_KEY` in `backend/.env` (optional `GEMINI_MODEL`, default `gemini-3.6-flash`).
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/api/auth/register` `{ name, email, password }` | → `{ token, user }` |
+| POST | `/api/auth/login` `{ email, password }` | → `{ token, user }` |
+| GET | `/api/auth/me` | current user (Bearer token) |
+| GET/POST | `/api/chat` | list chats / create empty chat |
+| GET/DELETE | `/api/chat/:id` | full chat / delete chat |
+| PUT | `/api/chat/:id/rename` `{ title }` | rename a chat |
+| POST | `/api/chat/:id/messages` `{ content }` | runs the pipeline: Reddit agent + web-research agent (parallel, Gemini with Google-Search grounding) → synthesizer; returns the assistant reply with sources |
 
 See `backend/README.md` for details and curl examples.
