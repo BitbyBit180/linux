@@ -1,0 +1,139 @@
+import Chat from '../models/Chat.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { searchReddit } from '../services/redditService.js';
+import { runWebResearch } from '../services/webResearchAgent.js';
+import { synthesizeAnswer } from '../services/synthesizerAgent.js';
+import { NO_KEY_MESSAGE } from '../services/geminiClient.js';
+
+// Chats are private: a mismatch is reported as 404 so we don't leak existence.
+const findOwnedChat = async (req, res) => {
+  const chat = await Chat.findById(req.params.id);
+  if (chat && chat.user.equals(req.user._id)) return chat;
+  res.status(404);
+  throw new Error('Chat not found');
+};
+
+// GET /api/chat — lean list (id, title, updatedAt, messageCount), newest first.
+export const getChats = asyncHandler(async (req, res) => {
+  const chats = await Chat.find({ user: req.user._id }).sort({ updatedAt: -1 }).lean();
+  res.json({
+    success: true,
+    count: chats.length,
+    data: chats.map((c) => ({
+      id: c._id.toString(),
+      title: c.title,
+      updatedAt: c.updatedAt,
+      messageCount: (c.messages || []).length,
+    })),
+  });
+});
+
+// POST /api/chat — create an empty chat.
+export const createChat = asyncHandler(async (req, res) => {
+  const chat = await Chat.create({ user: req.user._id });
+  res.status(201).json({ success: true, data: chat });
+});
+
+// GET /api/chat/:id — full chat with all messages.
+export const getChat = asyncHandler(async (req, res) => {
+  const chat = await findOwnedChat(req, res);
+  res.json({ success: true, data: chat });
+});
+
+// PUT /api/chat/:id/rename { title }
+export const renameChat = asyncHandler(async (req, res) => {
+  const chat = await findOwnedChat(req, res);
+  const title = (req.body?.title || '').trim().slice(0, 80);
+  if (!title) {
+    res.status(400);
+    throw new Error('A chat title is required');
+  }
+  chat.title = title;
+  await chat.save();
+  res.json({ success: true, data: chat });
+});
+
+// DELETE /api/chat/:id
+export const deleteChat = asyncHandler(async (req, res) => {
+  const chat = await findOwnedChat(req, res);
+  await chat.deleteOne();
+  res.json({ success: true, message: `Chat ${req.params.id} deleted` });
+});
+
+// POST /api/chat/:id/messages { content }
+// Multi-agent pipeline: the user message is saved first, then the two research
+// agents (Reddit + Gemini web) run IN PARALLEL, and the synthesizer produces
+// the final answer. The user message stays saved on failure so the client can
+// retry; the assistant message is only added on success.
+export const sendMessage = asyncHandler(async (req, res) => {
+  const chat = await findOwnedChat(req, res);
+
+  const content = (req.body?.content || '').trim();
+  if (!content) {
+    res.status(400);
+    throw new Error('Message content is required');
+  }
+
+  // Fast-fail before doing any work or saving anything.
+  if (!process.env.GEMINI_API_KEY || !process.env.GEMINI_API_KEY.trim()) {
+    res.status(503).json({ success: false, message: NO_KEY_MESSAGE });
+    return;
+  }
+
+  // History for the model = everything before this new message.
+  const history = chat.messages.map((m) => ({ role: m.role, text: m.content }));
+
+  const userMessage = { role: 'user', content, sources: [] };
+  chat.messages.push(userMessage);
+  await chat.save(); // persisted first so the client can retry on failure
+
+  // Research agents in parallel — each self-capped (Reddit ~8s, web ~20s)
+  // and best-effort (reddit → [], web → { findings: '', sources: [] }).
+  const [redditResults, webResearch] = await Promise.all([
+    searchReddit(content),
+    runWebResearch({ question: content, history }),
+  ]);
+
+  // Final answer from the synthesizer (no search tool — synthesis only).
+  let answer;
+  try {
+    answer = await synthesizeAnswer({
+      question: content,
+      history,
+      redditResults,
+      webFindings: webResearch.findings,
+      webSources: webResearch.sources,
+    });
+  } catch (err) {
+    res.status(502).json({
+      success: false,
+      message: err.message || 'AI assistant failed to produce an answer. Please try again.',
+    });
+    return;
+  }
+
+  // Merge web grounding sources with the top 3 Reddit thread URLs, deduped.
+  const redditThreads = redditResults
+    .slice(0, 3)
+    .map((r) => ({ title: r.title, url: r.url }));
+  const seen = new Set();
+  const sources = [];
+  for (const s of [...(answer.sources || []), ...redditThreads]) {
+    if (!s?.url || seen.has(s.url)) continue;
+    seen.add(s.url);
+    sources.push(s);
+  }
+
+  const assistantMessage = {
+    role: 'assistant',
+    content: answer.content,
+    sources,
+  };
+  chat.messages.push(assistantMessage);
+  if (chat.title === 'New chat') {
+    chat.title = content.slice(0, 48);
+  }
+  await chat.save();
+
+  res.json({ success: true, data: { userMessage, assistantMessage } });
+});
