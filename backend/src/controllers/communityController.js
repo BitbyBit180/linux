@@ -62,6 +62,18 @@ const withUserVotes = async (userId, targetType, docs) => {
   }));
 };
 
+// GET /api/community/stats?channel= — totals for the community sidebar cards.
+export const getChannelStats = asyncHandler(async (req, res) => {
+  const channel = (req.query.channel || '').toLowerCase();
+  const postFilter = channel && channel !== 'all' ? { channel } : {};
+  const posts = await Post.countDocuments(postFilter);
+  const postIds = await Post.find(postFilter).select('_id').lean();
+  const comments = await Comment.countDocuments({
+    post: { $in: postIds.map((p) => p._id) },
+  });
+  res.json({ success: true, data: { posts, comments } });
+});
+
 // GET /api/community/posts?channel=&sort=hot|new|top&search=&page=&limit=
 export const listPosts = asyncHandler(async (req, res) => {
   const channel = (req.query.channel || 'all').toLowerCase();

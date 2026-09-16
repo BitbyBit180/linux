@@ -10,6 +10,7 @@ import {
   updateComment,
   deleteComment,
   voteComment,
+  getChannelStats,
 } from '../controllers/communityController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -19,6 +20,7 @@ const router = express.Router();
 router.use(protect);
 
 router.route('/posts').get(listPosts).post(createPost);
+router.get('/stats', getChannelStats);
 router.route('/posts/:id').get(getPost).put(updatePost).delete(deletePost);
 router.post('/posts/:id/vote', votePost);
 router.post('/posts/:id/comments', addComment);
