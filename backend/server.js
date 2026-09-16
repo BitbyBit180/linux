@@ -4,6 +4,8 @@ import cors from 'cors';
 import connectDB from './src/config/db.js';
 import distroRoutes from './src/routes/distroRoutes.js';
 import flavourRoutes from './src/routes/flavourRoutes.js';
+import authRoutes from './src/routes/authRoutes.js';
+import chatRoutes from './src/routes/chatRoutes.js';
 import { notFound, errorHandler } from './src/middleware/errorMiddleware.js';
 
 const app = express();
@@ -23,6 +25,10 @@ app.get('/api/health', (req, res) => {
 // distros  -> full detail (specs + install guides) for the Detail page
 app.use('/api/flavours', flavourRoutes);
 app.use('/api/distros', distroRoutes);
+// auth    -> register/login/me for the AI assistant
+// chat    -> AI assistant conversations (all routes protected)
+app.use('/api/auth', authRoutes);
+app.use('/api/chat', chatRoutes);
 
 // 404 + error handler (must be last)
 app.use(notFound);
