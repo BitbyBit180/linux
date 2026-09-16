@@ -5,7 +5,9 @@ export const notFound = (req, res, next) => {
 // eslint-disable-next-line no-unused-vars
 export const errorHandler = (err, req, res, next) => {
   const statusCode =
-    res.statusCode && res.statusCode !== 200 ? res.statusCode : 500;
+    res.statusCode && res.statusCode !== 200
+      ? res.statusCode
+      : err.statusCode || 500;
 
   // Mongoose validation / duplicate-key niceties
   if (err?.name === 'ValidationError') {
