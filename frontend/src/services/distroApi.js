@@ -65,6 +65,24 @@ export async function getDistroById(id) {
   }
 }
 
+/**
+ * Side-by-side comparison data (up to 4 distros) from the
+ * `distros` collection, falling back to local static data offline.
+ * Returned order follows the requested ids; unknown ids are dropped.
+ */
+export async function getDistrosForCompare(ids = []) {
+  const wanted = ids.filter(Boolean);
+  if (wanted.length === 0) return [];
+  try {
+    const params = new URLSearchParams({ ids: wanted.join(',') });
+    const json = await fetchJSON(`${API_BASE}/distros/compare?${params.toString()}`);
+    return (json.data || []).map(normalize);
+  } catch {
+    const lower = wanted.map((id) => id.toLowerCase());
+    return DISTROS.filter((d) => lower.includes(d.id.toLowerCase()));
+  }
+}
+
 export async function getPopularDistros() {
   try {
     const json = await fetchJSON(`${API_BASE}/flavours/popular`);
