@@ -146,13 +146,15 @@ export default function Navbar({
             )}
           </div>
 
-          {/* Links to the right of the search box: Community & AI Chat */}
-          {['Community', 'AI Chat'].map((item) => (
+          {/* Links to the right of the search box: Compare, Community & AI Chat */}
+          {['Compare', 'Community', 'AI Chat'].map((item) => (
             <a
               key={item}
-              href="#"
+              href={item === 'Compare' ? '/compare' : item === 'AI Chat' ? '/chat' : '#'}
               onClick={(e) => {
                 e.preventDefault();
+                if (item === 'Compare') onNavigate?.('/compare');
+                else if (item === 'AI Chat') onNavigate?.('/chat');
               }}
               onMouseEnter={() => setHoveredNav(item)}
               onMouseLeave={() => setHoveredNav(null)}
@@ -179,18 +181,24 @@ export default function Navbar({
           ))}
         </>
       ) : (
-        /* Hero Mode: Distros, Docs, Community, AI Chat, and Get Started button */
+        /* Hero Mode: Distros, Compare, Docs, Community, AI Chat, and Get Started button */
         <>
-          {['Distros', 'Docs', 'Community', 'AI Chat'].map((item) => {
+          {['Distros', 'Compare', 'Docs', 'Community', 'AI Chat'].map((item) => {
             const isDistros = item === 'Distros';
+            const isCompare = item === 'Compare';
+            const isAIChat = item === 'AI Chat';
             return (
               <a
                 key={item}
-                href={isDistros ? '/flavours' : '#'}
+                href={isDistros ? '/flavours' : isCompare ? '/compare' : isAIChat ? '/chat' : '#'}
                 onClick={(e) => {
                   e.preventDefault();
                   if (isDistros) {
                     onNavigate?.('/flavours');
+                  } else if (isCompare) {
+                    onNavigate?.('/compare');
+                  } else if (isAIChat) {
+                    onNavigate?.('/chat');
                   }
                 }}
                 onMouseEnter={() => setHoveredNav(item)}
