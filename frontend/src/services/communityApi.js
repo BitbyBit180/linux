@@ -125,3 +125,11 @@ export async function voteComment(id, value) {
   });
   return json.data;
 }
+
+/** GET /api/community/stats?channel= -> { posts, comments } */
+export async function getChannelStats(channel = 'all') {
+  const json = await request(
+    `/community/stats?channel=${encodeURIComponent(channel)}`
+  );
+  return json.data;
+}
