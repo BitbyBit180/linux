@@ -19,6 +19,8 @@ const userSchema = new mongoose.Schema(
       required: [true, 'passwordHash is required'],
     },
     name: { type: String, default: '' },
+    // Admins can moderate (edit/delete) any post or comment.
+    isAdmin: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
