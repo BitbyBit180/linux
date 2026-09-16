@@ -17,17 +17,25 @@ import {
   Loader2,
   TriangleAlert,
   MessageSquare,
+  Search,
+  Share2,
   X,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.js';
 import { useDistros } from '../hooks/useDistros.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
-import VoteButtons from '../components/community/VoteButtons.jsx';
-import { ChannelBadge } from '../components/community/PostCard.jsx';
+import VotePill from '../components/community/VotePill.jsx';
+import { ChannelAvatar } from '../components/community/Avatar.jsx';
+import { RowAction } from '../components/community/PostCard.jsx';
 import CommentItem from '../components/community/CommentItem.jsx';
+import CommunityShell from '../components/community/CommunityShell.jsx';
+import { RailCard } from '../components/community/CommunityShell.jsx';
+import CommunityNav from '../components/community/CommunityNav.jsx';
+import { AboutChannel, CommunityRules } from '../components/community/CommunitySidebar.jsx';
 import { timeAgo } from '../utils/timeAgo.js';
 import {
   getPost,
+  getChannelStats,
   updatePost,
   deletePost,
   votePost,
@@ -434,6 +442,23 @@ const findComment = (comments, id) => {
   return null;
 };
 
+// Comment list controls (Reddit-style Best/New + search)
+const sortComments = (comments, mode) =>
+  [...comments]
+    .sort((a, b) =>
+      mode === 'new'
+        ? new Date(b.createdAt) - new Date(a.createdAt)
+        : b.score - a.score
+    )
+    .map((c) => ({ ...c, replies: sortComments(c.replies || [], mode) }));
+
+const searchComments = (comments, q) =>
+  comments
+    .map((c) => ({ ...c, replies: searchComments(c.replies || [], q) }))
+    .filter(
+      (c) => c.body.toLowerCase().includes(q) || c.replies.length > 0
+    );
+
 /* ------------------------------ detail page -------------------------------- */
 
 export default function PostDetailPage({ postId, onNavigate }) {
@@ -458,7 +483,24 @@ export default function PostDetailPage({ postId, onNavigate }) {
   const [commentDraft, setCommentDraft] = useState('');
   const [postingComment, setPostingComment] = useState(false);
 
+  // Reddit-style comment controls
+  const [commentSort, setCommentSort] = useState('best'); // best | new
+  const [commentSearch, setCommentSearch] = useState('');
+  const [shared, setShared] = useState(false);
+  const shareTimer = useRef(null);
+
+  const [channelStats, setChannelStats] = useState(null);
+
   const components = useMarkdownComponents();
+
+  // Comments shown in the list, after the Best/New sort + search filters
+  const visibleComments = useMemo(() => {
+    let list = comments;
+    const q = commentSearch.trim().toLowerCase();
+    if (q) list = searchComments(list, q);
+    list = sortComments(list, commentSort);
+    return list;
+  }, [comments, commentSort, commentSearch]);
 
   /* ------------------------------- data loading ----------------------------- */
 
@@ -483,6 +525,18 @@ export default function PostDetailPage({ postId, onNavigate }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Channel stats for the "About this channel" rail card
+  useEffect(() => {
+    if (!post?.channel) return;
+    let cancelled = false;
+    getChannelStats(post.channel)
+      .then((s) => !cancelled && setChannelStats(s))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [post?.channel]);
 
   /* --------------------------------- actions -------------------------------- */
 
@@ -703,47 +757,65 @@ export default function PostDetailPage({ postId, onNavigate }) {
   })();
   const commentTotal = countComments(comments);
 
+  const handleShare = () => {
+    navigator.clipboard
+      .writeText(`${window.location.origin}/community/${postId}`)
+      .catch(() => {});
+    setShared(true);
+    clearTimeout(shareTimer.current);
+    shareTimer.current = setTimeout(() => setShared(false), 1500);
+  };
+
   /* ---------------------------------- view ---------------------------------- */
 
   return (
-    <div style={{ backgroundColor: THEME.bg, minHeight: '100vh', position: 'relative' }}>
-      {/* Shared hero background texture */}
-      <div className="hero-bg fixed inset-0 z-0" aria-hidden="true">
-        <div className="grain-fine" />
-        <div className="grain-fiber" />
-      </div>
-
-      <div
-        className="relative z-10 mx-auto"
-        style={{ maxWidth: 820, padding: '96px 20px 64px' }}
+    <>
+    <CommunityShell
+      nav={
+        <CommunityNav
+          distros={distros}
+          channel={post?.channel || 'all'}
+          onNavigate={onNavigate}
+          onChannel={(k) => onNavigate?.('/community')}
+          onCreatePost={() => onNavigate?.('/community')}
+        />
+      }
+      rail={
+        post ? (
+          <>
+            <AboutChannel channel={post.channel} distro={distro} stats={channelStats} />
+            <CommunityRules />
+          </>
+        ) : null
+      }
+    >
+      {/* Back */}
+      <button
+        type="button"
+        onClick={() => onNavigate?.('/community')}
+        title="Back to Community"
+        className="inline-flex items-center justify-center transition-colors"
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 9999,
+          border: `1px solid ${LINE}`,
+          background: 'rgba(255,255,255,0.04)',
+          color: THEME.textMuted,
+          cursor: 'pointer',
+          marginBottom: 14,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = THEME.textMain;
+          e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = THEME.textMuted;
+          e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+        }}
       >
-        {/* Back link */}
-        <button
-          type="button"
-          onClick={() => onNavigate?.('/community')}
-          className="inline-flex items-center transition-colors"
-          style={{
-            gap: 6,
-            fontFamily: MONO,
-            fontSize: '0.76rem',
-            fontWeight: 700,
-            color: THEME.textMuted,
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            marginBottom: 14,
-            cursor: 'pointer',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = THEME.textMain;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = THEME.textMuted;
-          }}
-        >
-          <ArrowLeft size={14} />
-          Community
-        </button>
+        <ArrowLeft size={16} />
+      </button>
 
         {loading ? (
           <p
@@ -771,204 +843,175 @@ export default function PostDetailPage({ postId, onNavigate }) {
           </p>
         ) : post ? (
           <>
-            {/* Post card */}
-            <article style={{ ...GLASS, borderRadius: 20, padding: 18 }}>
-              <div className="flex" style={{ gap: 14 }}>
-                <VoteButtons score={post.score} userVote={post.userVote} onVote={handleVote} size={19} />
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {/* Meta */}
-                  <div className="flex flex-wrap items-center" style={{ gap: 8, marginBottom: 8 }}>
-                    <ChannelBadge channel={post.channel} distro={distro} />
-                    <span style={{ fontFamily: MONO, fontSize: '0.68rem', color: THEME.silver }}>
-                      posted by u/{post.author?.name || 'unknown'}
-                    </span>
-                    <span style={{ fontFamily: MONO, fontSize: '0.68rem', color: THEME.textMuted }}>
-                      {timeAgo(post.createdAt)}
-                      {post.updatedAt && post.updatedAt !== post.createdAt
-                        ? ` · edited ${timeAgo(post.updatedAt)}`
-                        : ''}
-                    </span>
+            {/* Post (flat Reddit-style) */}
+            <article style={{ borderBottom: `1px solid ${LINE}`, paddingBottom: 16 }}>
+              {/* Header: channel avatar + d/channel, author · time */}
+              <div className="flex items-center" style={{ gap: 10, marginBottom: 12 }}>
+                <ChannelAvatar channel={post.channel} distro={distro} size={36} />
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      color: THEME.textMain,
+                    }}
+                  >
+                    d/{post.channel === 'general' ? 'General' : post.channel}
                   </div>
-
-                  {/* Title / edit form */}
-                  {editing ? (
-                    <EditPostForm
-                      post={post}
-                      saving={savingPost}
-                      onSave={handleSavePost}
-                      onCancel={() => setEditing(false)}
-                    />
-                  ) : (
-                    <>
-                      <h1
-                        style={{
-                          fontFamily: MONO,
-                          fontSize: '1.15rem',
-                          fontWeight: 800,
-                          color: THEME.textMain,
-                          margin: 0,
-                          lineHeight: 1.4,
-                          overflowWrap: 'anywhere',
-                        }}
-                      >
-                        {post.title}
-                      </h1>
-
-                      {post.linkUrl && hostname && (
-                        <a
-                          href={post.linkUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center transition-colors"
-                          style={{
-                            marginTop: 6,
-                            gap: 5,
-                            fontFamily: MONO,
-                            fontSize: '0.74rem',
-                            color: THEME.accent,
-                            textDecoration: 'none',
-                            overflowWrap: 'anywhere',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.textDecoration = 'underline';
-                            e.currentTarget.style.textUnderlineOffset = 2;
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.textDecoration = 'none';
-                          }}
-                        >
-                          <ExternalLink size={12} />
-                          {post.linkUrl}
-                        </a>
-                      )}
-
-                      {/* Body (markdown, same pipeline as ChatPage) */}
-                      {post.body && (
-                        <div className="dp-md" style={{ marginTop: 12 }}>
-                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-                            {post.body}
-                          </ReactMarkdown>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {/* Owner actions */}
-                  {isOwner && !editing && (
-                    <div className="flex items-center" style={{ gap: 10, marginTop: 12 }}>
-                      <button
-                        type="button"
-                        onClick={() => setEditing(true)}
-                        className="inline-flex items-center transition-colors"
-                        style={{
-                          gap: 5,
-                          fontFamily: MONO,
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          color: THEME.textMuted,
-                          background: 'none',
-                          border: 'none',
-                          padding: '2px 4px',
-                          cursor: 'pointer',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = THEME.textMain;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = THEME.textMuted;
-                        }}
-                      >
-                        <Pencil size={12} />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDelete(true)}
-                        className="inline-flex items-center transition-colors"
-                        style={{
-                          gap: 5,
-                          fontFamily: MONO,
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          color: THEME.textMuted,
-                          background: 'none',
-                          border: 'none',
-                          padding: '2px 4px',
-                          cursor: 'pointer',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = THEME.accent;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = THEME.textMuted;
-                        }}
-                      >
-                        <Trash2 size={12} />
-                        Delete
-                      </button>
-                    </div>
-                  )}
+                  <div style={{ fontFamily: MONO, fontSize: '0.66rem', color: THEME.silver }}>
+                    u/{post.author?.name || 'unknown'} · {timeAgo(post.createdAt)}
+                    {post.updatedAt && post.updatedAt !== post.createdAt
+                      ? ` · edited ${timeAgo(post.updatedAt)}`
+                      : ''}
+                  </div>
                 </div>
               </div>
+
+              {/* Title / edit form */}
+              {editing ? (
+                <EditPostForm
+                  post={post}
+                  saving={savingPost}
+                  onSave={handleSavePost}
+                  onCancel={() => setEditing(false)}
+                />
+              ) : (
+                <>
+                  <h1
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: '1.28rem',
+                      fontWeight: 800,
+                      color: THEME.textMain,
+                      margin: 0,
+                      lineHeight: 1.4,
+                      overflowWrap: 'anywhere',
+                    }}
+                  >
+                    {post.title}
+                  </h1>
+
+                  {post.linkUrl && hostname && (
+                    <a
+                      href={post.linkUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center transition-colors"
+                      style={{
+                        marginTop: 8,
+                        gap: 5,
+                        fontFamily: MONO,
+                        fontSize: '0.74rem',
+                        color: THEME.accent,
+                        textDecoration: 'none',
+                        overflowWrap: 'anywhere',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.textDecoration = 'underline';
+                        e.currentTarget.style.textUnderlineOffset = 2;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.textDecoration = 'none';
+                      }}
+                    >
+                      <ExternalLink size={12} />
+                      {post.linkUrl}
+                    </a>
+                  )}
+
+                  {/* Body (markdown, same pipeline as ChatPage) */}
+                  {post.body && (
+                    <div className="dp-md" style={{ marginTop: 12 }}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+                        {post.body}
+                      </ReactMarkdown>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Action bar */}
+              {!editing && (
+                <div className="flex items-center flex-wrap" style={{ gap: 8, marginTop: 16 }}>
+                  <VotePill
+                    score={post.score}
+                    userVote={post.userVote}
+                    onVote={handleVote}
+                    size={17}
+                  />
+                  <RowAction
+                    icon={<MessageSquare size={14} />}
+                    label={`${commentTotal} ${
+                      commentTotal === 1 ? 'comment' : 'comments'
+                    }`}
+                    onClick={() =>
+                      document
+                        .getElementById('community-comments')
+                        ?.scrollIntoView({ behavior: 'smooth' })
+                    }
+                  />
+                  <RowAction
+                    icon={shared ? <Check size={14} /> : <Share2 size={14} />}
+                    label={shared ? 'Copied' : 'Share'}
+                    onClick={handleShare}
+                  />
+                  {isOwner && (
+                    <>
+                      <RowAction
+                        icon={<Pencil size={13} />}
+                        label="Edit"
+                        onClick={() => setEditing(true)}
+                      />
+                      <RowAction
+                        icon={<Trash2 size={13} />}
+                        label="Delete"
+                        danger
+                        onClick={() => setConfirmDelete(true)}
+                      />
+                    </>
+                  )}
+                </div>
+              )}
             </article>
 
             {/* Comments section */}
-            <section style={{ marginTop: 20 }}>
-              {/* Header + count */}
-              <div
-                className="flex items-center"
-                style={{ gap: 8, marginBottom: 12 }}
-              >
-                <MessageSquare size={15} style={{ color: THEME.textMuted }} />
-                <h2
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: '0.88rem',
-                    fontWeight: 800,
-                    color: THEME.textMain,
-                    margin: 0,
-                  }}
-                >
-                  {commentTotal} {commentTotal === 1 ? 'comment' : 'comments'}
-                </h2>
-              </div>
-
-              {/* Add comment */}
+            <section id="community-comments" style={{ marginTop: 24 }}>
+              {/* "Join the conversation" composer */}
               <div
                 style={{
-                  ...GLASS,
-                  borderRadius: 16,
-                  padding: 12,
-                  marginBottom: 16,
+                  border: `1px solid ${commentDraft ? `${THEME.accent}55` : LINE}`,
+                  borderRadius: 9999,
+                  transition: 'border-color 0.2s ease',
                 }}
               >
                 <textarea
                   value={commentDraft}
                   onChange={(e) => setCommentDraft(e.target.value)}
-                  rows={3}
-                  placeholder={`Add a comment as u/${user?.name || 'you'}…`}
+                  rows={commentDraft ? 3 : 1}
+                  placeholder="Join the conversation"
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
-                    resize: 'vertical',
-                    background: 'rgba(20, 24, 32, 0.6)',
-                    border: `1px solid ${LINE}`,
-                    borderRadius: 10,
+                    resize: 'none',
+                    background: 'rgba(20, 24, 32, 0.45)',
+                    border: 'none',
+                    borderRadius: commentDraft ? 12 : 9999,
                     outline: 'none',
-                    padding: '8px 10px',
+                    padding: commentDraft ? '12px 16px' : '10px 18px',
                     fontFamily: MONO,
-                    fontSize: '0.78rem',
+                    fontSize: '0.8rem',
                     lineHeight: 1.6,
                     color: THEME.textMain,
-                    marginBottom: 8,
                   }}
                 />
-                <div className="flex items-center" style={{ gap: 8 }}>
+              </div>
+              {commentDraft && (
+                <div className="flex items-center" style={{ gap: 8, marginTop: 8 }}>
                   <button
                     type="button"
                     onClick={handleAddComment}
-                    disabled={postingComment || !commentDraft.trim()}
+                    disabled={postingComment}
                     className="inline-flex items-center transition-all"
                     style={{
                       gap: 6,
@@ -980,34 +1023,140 @@ export default function PostDetailPage({ postId, onNavigate }) {
                       border: '1px solid rgba(255,255,255,0.25)',
                       borderRadius: 9999,
                       padding: '6px 16px',
-                      cursor: postingComment || !commentDraft.trim() ? 'not-allowed' : 'pointer',
-                      opacity: postingComment || !commentDraft.trim() ? 0.55 : 1,
+                      cursor: postingComment ? 'wait' : 'pointer',
+                      opacity: postingComment ? 0.7 : 1,
                     }}
                   >
                     {postingComment && <Loader2 size={12} className="animate-spin" />}
                     Comment
                   </button>
-                  {commentDraft && (
+                  <button
+                    type="button"
+                    onClick={() => setCommentDraft('')}
+                    className="inline-flex items-center transition-colors"
+                    style={{
+                      gap: 4,
+                      fontFamily: MONO,
+                      fontSize: '0.7rem',
+                      color: THEME.textMuted,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px 6px',
+                    }}
+                  >
+                    <X size={12} />
+                    Clear
+                  </button>
+                </div>
+              )}
+
+              {/* Sort + search row */}
+              <div
+                className="flex flex-wrap items-center"
+                style={{ gap: 8, margin: '20px 0 12px' }}
+              >
+                <span
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: '0.7rem',
+                    color: THEME.textMuted,
+                  }}
+                >
+                  Sort by:
+                </span>
+                {[
+                  { key: 'best', label: 'Best' },
+                  { key: 'new', label: 'New' },
+                ].map((s) => {
+                  const active = commentSort === s.key;
+                  return (
+                    <button
+                      key={s.key}
+                      type="button"
+                      onClick={() => setCommentSort(s.key)}
+                      className="rounded-full font-mono transition-all shrink-0"
+                      style={{
+                        fontFamily: MONO,
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        padding: '3px 11px',
+                        background: active ? 'rgba(224, 90, 56, 0.16)' : 'transparent',
+                        color: active ? THEME.accent : THEME.textMuted,
+                        border: active
+                          ? '1px solid rgba(224, 90, 56, 0.45)'
+                          : `1px solid ${LINE}`,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+                <div style={{ flex: 1, minWidth: 40 }} />
+                <div
+                  className="flex items-center"
+                  style={{
+                    flex: 1,
+                    minWidth: 170,
+                    maxWidth: 280,
+                    background: 'rgba(20, 24, 32, 0.55)',
+                    border: `1px solid ${LINE}`,
+                    borderRadius: 9999,
+                    padding: '4px 12px',
+                    gap: 8,
+                  }}
+                >
+                  <Search size={13} style={{ color: THEME.textMuted, flexShrink: 0 }} />
+                  <input
+                    type="text"
+                    value={commentSearch}
+                    onChange={(e) => setCommentSearch(e.target.value)}
+                    placeholder="Search comments"
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      fontFamily: MONO,
+                      fontSize: '0.72rem',
+                      color: THEME.textMain,
+                    }}
+                  />
+                  {commentSearch && (
                     <button
                       type="button"
-                      onClick={() => setCommentDraft('')}
-                      className="inline-flex items-center transition-colors"
+                      onClick={() => setCommentSearch('')}
                       style={{
-                        gap: 4,
-                        fontFamily: MONO,
-                        fontSize: '0.7rem',
-                        color: THEME.textMuted,
                         background: 'none',
                         border: 'none',
+                        color: THEME.textMuted,
                         cursor: 'pointer',
-                        padding: '4px 6px',
+                        padding: 0,
+                        display: 'flex',
                       }}
                     >
                       <X size={12} />
-                      Clear
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* Count */}
+              <div className="flex items-center" style={{ gap: 8, marginBottom: 8 }}>
+                <MessageSquare size={14} style={{ color: THEME.textMuted }} />
+                <h2
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: '0.84rem',
+                    fontWeight: 800,
+                    color: THEME.textMain,
+                    margin: 0,
+                  }}
+                >
+                  {commentTotal} {commentTotal === 1 ? 'comment' : 'comments'}
+                </h2>
               </div>
 
               {/* Inline error */}
@@ -1026,7 +1175,7 @@ export default function PostDetailPage({ postId, onNavigate }) {
               )}
 
               {/* Comment list */}
-              {comments.length === 0 ? (
+              {visibleComments.length === 0 ? (
                 <p
                   style={{
                     fontFamily: MONO,
@@ -1036,10 +1185,12 @@ export default function PostDetailPage({ postId, onNavigate }) {
                     padding: '20px 0',
                   }}
                 >
-                  No comments yet — be the first.
+                  {commentSearch.trim()
+                    ? 'No comments match your search.'
+                    : 'No comments yet — be the first.'}
                 </p>
               ) : (
-                comments.map((c) => (
+                visibleComments.map((c) => (
                   <CommentItem
                     key={c.id}
                     comment={c}
@@ -1054,7 +1205,7 @@ export default function PostDetailPage({ postId, onNavigate }) {
             </section>
           </>
         ) : null}
-      </div>
+    </CommunityShell>
 
       {/* Delete confirmation */}
       {confirmDelete && (
@@ -1064,6 +1215,6 @@ export default function PostDetailPage({ postId, onNavigate }) {
           onConfirm={handleDeletePost}
         />
       )}
-    </div>
+    </>
   );
 }
