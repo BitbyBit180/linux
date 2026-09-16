@@ -113,4 +113,17 @@ Set `JWT_SECRET` and `GEMINI_API_KEY` in `backend/.env` (optional `GEMINI_MODEL`
 | PUT | `/api/chat/:id/rename` `{ title }` | rename a chat |
 | POST | `/api/chat/:id/messages` `{ content }` | runs the pipeline: Reddit agent + web-research agent (parallel, Gemini with Google-Search grounding) → synthesizer; returns the assistant reply with sources |
 
+### Community (JWT-protected, per-distro channels)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/community/posts?channel=&sort=hot\|new\|top&search=&page=` | feed; channels are `general`, a `distroId`, or `all` |
+| POST | `/api/community/posts` `{ channel, title, body?, linkUrl? }` | create a post (text + optional link) |
+| GET | `/api/community/posts/:id` | post + threaded comments (one nesting level) |
+| PUT/DELETE | `/api/community/posts/:id` | edit/delete (author or admin; delete cascades) |
+| POST | `/api/community/posts/:id/vote` `{ value: 1\|-1\|0 }` | up / down / un-vote |
+| POST | `/api/community/posts/:id/comments` `{ body, parentId? }` | comment or reply |
+| PUT/DELETE | `/api/community/comments/:id` | edit/delete (author or admin) |
+| POST | `/api/community/comments/:id/vote` `{ value: 1\|-1\|0 }` | comment voting |
+
 See `backend/README.md` for details and curl examples.
