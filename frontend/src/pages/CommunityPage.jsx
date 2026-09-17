@@ -9,9 +9,7 @@ import CommunityShell from '../components/community/CommunityShell.jsx';
 import { RailCard } from '../components/community/CommunityShell.jsx';
 import CommunityNav from '../components/community/CommunityNav.jsx';
 import {
-  AboutCommunity,
   RecentPosts,
-  CommunityRules,
 } from '../components/community/CommunitySidebar.jsx';
 import { listPosts, createPost, votePost } from '../services/communityApi.js';
 
@@ -39,6 +37,7 @@ function Composer({ distros, defaultChannel, posting, onPost, onCancel }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  const [showLink, setShowLink] = useState(false);
   const [localError, setLocalError] = useState(null);
 
   // Re-seed the channel when the selected tab changes (and the composer is open)
@@ -68,139 +67,101 @@ function Composer({ distros, defaultChannel, posting, onPost, onCancel }) {
 
   return (
     <div className="dp-fade" style={{ ...GLASS, borderRadius: 18, padding: 16, marginBottom: 18 }}>
-      <div style={{ display: 'flex', gap: 10 }}>
-        {/* Body field grows; channel select sits beside it */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Post title (min. 3 characters)"
-            maxLength={200}
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              fontFamily: MONO,
-              fontSize: '0.88rem',
-              fontWeight: 700,
-              color: THEME.textMain,
-              background: 'rgba(20, 24, 32, 0.6)',
-              border: `1px solid ${LINE}`,
-              borderRadius: 10,
-              padding: '10px 12px',
-              outline: 'none',
-              marginBottom: 10,
-            }}
-          />
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Post title"
+        maxLength={200}
+        style={{
+          width: '100%',
+          boxSizing: 'border-box',
+          fontFamily: MONO,
+          fontSize: '0.88rem',
+          fontWeight: 700,
+          color: THEME.textMain,
+          background: 'rgba(20, 24, 32, 0.6)',
+          border: `1px solid ${LINE}`,
+          borderRadius: 10,
+          padding: '10px 12px',
+          outline: 'none',
+          marginBottom: 10,
+        }}
+      />
 
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="What do you want to share? (optional)"
-            rows={5}
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              resize: 'vertical',
-              fontFamily: MONO,
-              fontSize: '0.8rem',
-              lineHeight: 1.6,
-              color: THEME.textMain,
-              background: 'rgba(20, 24, 32, 0.6)',
-              border: `1px solid ${LINE}`,
-              borderRadius: 10,
-              padding: '10px 12px',
-              outline: 'none',
-              marginBottom: 4,
-            }}
-          />
-          <p
-            style={{
-              margin: '0 0 8px',
-              fontFamily: MONO,
-              fontSize: '0.64rem',
-              color: THEME.textMuted,
-            }}
-          >
-            Markdown supported — code fences, lists, links and tables all render.
-          </p>
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder="What do you want to share? (optional — markdown works)"
+        rows={4}
+        style={{
+          width: '100%',
+          boxSizing: 'border-box',
+          resize: 'vertical',
+          fontFamily: MONO,
+          fontSize: '0.8rem',
+          lineHeight: 1.6,
+          color: THEME.textMain,
+          background: 'rgba(20, 24, 32, 0.6)',
+          border: `1px solid ${LINE}`,
+          borderRadius: 10,
+          padding: '10px 12px',
+          outline: 'none',
+          marginBottom: 10,
+        }}
+      />
 
-          <input
-            value={linkUrl}
-            onChange={(e) => setLinkUrl(e.target.value)}
-            placeholder="Link URL (optional — https://…)"
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              fontFamily: MONO,
-              fontSize: '0.76rem',
-              color: THEME.textMain,
-              background: 'rgba(20, 24, 32, 0.6)',
-              border: `1px solid ${LINE}`,
-              borderRadius: 10,
-              padding: '8px 12px',
-              outline: 'none',
-            }}
-          />
-        </div>
-
-        {/* Channel select column */}
-        <div style={{ width: 170, flexShrink: 0 }}>
-          <label
-            style={{
-              display: 'block',
-              fontFamily: MONO,
-              fontSize: '0.62rem',
-              fontWeight: 700,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: THEME.textMuted,
-              marginBottom: 6,
-            }}
-          >
-            Channel
-          </label>
-          <select
-            value={channel}
-            onChange={(e) => setChannel(e.target.value)}
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              fontFamily: MONO,
-              fontSize: '0.8rem',
-              color: THEME.textMain,
-              background: 'rgba(20, 24, 32, 0.6)',
-              border: `1px solid ${LINE}`,
-              borderRadius: 10,
-              padding: '8px 10px',
-              outline: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="general">General</option>
-            {distros.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {localError && (
-        <p
+      {/* Bottom row: channel + optional link toggle + actions */}
+      <div className="flex flex-wrap items-center" style={{ gap: 8 }}>
+        <select
+          value={channel}
+          onChange={(e) => setChannel(e.target.value)}
           style={{
-            margin: '10px 0 0',
             fontFamily: MONO,
-            fontSize: '0.7rem',
-            color: THEME.accent,
+            fontSize: '0.74rem',
+            color: THEME.textMain,
+            background: 'rgba(20, 24, 32, 0.6)',
+            border: `1px solid ${LINE}`,
+            borderRadius: 9999,
+            padding: '6px 10px',
+            outline: 'none',
+            cursor: 'pointer',
           }}
         >
-          {localError}
-        </p>
-      )}
+          <option value="general">General</option>
+          {distros.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </select>
 
-      {/* Actions */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+        {!showLink && (
+          <button
+            type="button"
+            onClick={() => setShowLink(true)}
+            className="transition-colors"
+            style={{
+              fontFamily: MONO,
+              fontSize: '0.72rem',
+              color: THEME.textMuted,
+              background: 'none',
+              border: `1px dashed ${LINE}`,
+              borderRadius: 9999,
+              padding: '6px 12px',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = THEME.textMain;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = THEME.textMuted;
+            }}
+          >
+            + Add link
+          </button>
+        )}
+
+        <div style={{ flex: 1 }} />
         <button
           type="button"
           onClick={onCancel}
@@ -244,6 +205,41 @@ function Composer({ distros, defaultChannel, posting, onPost, onCancel }) {
           Post
         </button>
       </div>
+
+      {showLink && (
+        <input
+          value={linkUrl}
+          onChange={(e) => setLinkUrl(e.target.value)}
+          placeholder="Link URL (https://…)"
+          autoFocus
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            fontFamily: MONO,
+            fontSize: '0.76rem',
+            color: THEME.textMain,
+            background: 'rgba(20, 24, 32, 0.6)',
+            border: `1px solid ${LINE}`,
+            borderRadius: 10,
+            padding: '8px 12px',
+            outline: 'none',
+            marginTop: 10,
+          }}
+        />
+      )}
+
+      {localError && (
+        <p
+          style={{
+            margin: '10px 0 0',
+            fontFamily: MONO,
+            fontSize: '0.7rem',
+            color: THEME.accent,
+          }}
+        >
+          {localError}
+        </p>
+      )}
     </div>
   );
 }
@@ -409,9 +405,7 @@ export default function CommunityPage({ onNavigate }) {
       }
       rail={
         <>
-          <AboutCommunity />
           <RecentPosts onOpen={(p) => onNavigate?.(`/community/${p.id}`)} />
-          <CommunityRules />
         </>
       }
     >
