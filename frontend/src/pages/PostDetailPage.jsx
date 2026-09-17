@@ -31,7 +31,7 @@ import CommentItem from '../components/community/CommentItem.jsx';
 import CommunityShell from '../components/community/CommunityShell.jsx';
 import { RailCard } from '../components/community/CommunityShell.jsx';
 import CommunityNav from '../components/community/CommunityNav.jsx';
-import { AboutChannel, CommunityRules } from '../components/community/CommunitySidebar.jsx';
+import { AboutChannel } from '../components/community/CommunitySidebar.jsx';
 import { timeAgo } from '../utils/timeAgo.js';
 import {
   getPost,
@@ -784,7 +784,6 @@ export default function PostDetailPage({ postId, onNavigate }) {
         post ? (
           <>
             <AboutChannel channel={post.channel} distro={distro} stats={channelStats} />
-            <CommunityRules />
           </>
         ) : null
       }
@@ -1051,7 +1050,9 @@ export default function PostDetailPage({ postId, onNavigate }) {
                 </div>
               )}
 
-              {/* Sort + search row */}
+              {/* Sort + search row — only once there are enough comments
+                  for it to matter (keeps small threads calm) */}
+              {commentTotal > 3 && (
               <div
                 className="flex flex-wrap items-center"
                 style={{ gap: 8, margin: '20px 0 12px' }}
@@ -1142,6 +1143,7 @@ export default function PostDetailPage({ postId, onNavigate }) {
                   )}
                 </div>
               </div>
+              )}
 
               {/* Count */}
               <div className="flex items-center" style={{ gap: 8, marginBottom: 8 }}>
