@@ -2,7 +2,7 @@ import Distro from '../models/Distro.js';
 import { DISTROS as STATIC_DISTROS } from '../data/distros.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { recommendDistro } from '../services/quizAgent.js';
-import { NO_KEY_MESSAGE } from '../services/geminiClient.js';
+import { NO_KEY_MESSAGE } from '../services/groqClient.js';
 
 const CATALOGUE_FIELDS = 'distroId name tagline category desktop releaseModel minRam';
 
@@ -83,7 +83,7 @@ export const recommendQuizDistro = asyncHandler(async (req, res) => {
     });
 
   // Graceful degradation before spending a model call.
-  if (!process.env.GEMINI_API_KEY || !process.env.GEMINI_API_KEY.trim()) {
+  if (!process.env.GROQ_API_KEY || !process.env.GROQ_API_KEY.trim()) {
     return fallback(NO_KEY_MESSAGE);
   }
 

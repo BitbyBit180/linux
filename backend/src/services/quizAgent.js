@@ -1,12 +1,12 @@
 // QUIZ agent — turns "Find Your Distro" quiz answers into a personalized
-// recommendation with a human-readable explanation. Single Gemini call,
-// synthesis only (no search grounding — keeps it fast and cheap).
+// recommendation with a human-readable explanation. Single Groq call,
+// synthesis only (keeps it fast and cheap).
 //
 // Contract: the controller passes the user's readable Q&A, the rule-based
 // shortlist (hint), and the distro catalogue. We return the parsed JSON:
 // { winner, runnersUp[2], explanation, strengths{}, tip }.
 
-import { generateContent } from './geminiClient.js';
+import { chatCompletion } from './groqClient.js';
 
 const SYSTEM_INSTRUCTION = `You are DistroPedia's distro-matching expert. A user answered a "Find Your Distro" quiz. Recommend exactly ONE winner and TWO runners-up chosen ONLY from the allowed catalogue ids.
 
@@ -20,14 +20,6 @@ Return STRICT JSON only — no markdown fences, no prose outside the JSON:
   "strengths": { "<winner id>": "one line: its killer trait for this user", "<runner id>": "one line each" },
   "tip": "one concrete first step after installing the winner (under 20 words)"
 }`;
-
-function extractText(data) {
-  const candidate = data?.candidates?.[0];
-  return (candidate?.content?.parts || [])
-    .map((p) => p.text || '')
-    .join('')
-    .trim();
-}
 
 function parseRecommendation(text) {
   const clean = String(text || '')
@@ -65,14 +57,16 @@ export async function recommendDistro({ answers = [], shortlist = [], catalogue 
     catLines,
   ].join('\n');
 
-  const data = await generateContent(
+  const text = await chatCompletion(
     {
-      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      // NOTE: no google_search tool — synthesis only.
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      system: SYSTEM_INSTRUCTION,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      maxTokens: 1024,
+      jsonMode: true,
     },
     { timeoutMs: 25000 }
   );
 
-  return parseRecommendation(extractText(data));
+  return parseRecommendation(text);
 }

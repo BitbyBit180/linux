@@ -1,8 +1,8 @@
 // SYNTHESIZER agent — turns the sub-agent research (Reddit digest + web
-// findings) into the final user-facing Markdown answer. No google_search
-// tool here (synthesis only, keeps this call fast).
+// findings) into the final user-facing Markdown answer. Synthesis only,
+// keeps this call fast.
 
-import { generateContent, toContents } from './geminiClient.js';
+import { chatCompletion, toMessages } from './groqClient.js';
 
 const SYSTEM_INSTRUCTION = `You are DistroPedia Assistant, an expert Linux troubleshooting assistant speaking to the user. You receive research from two sub-agents (Reddit digest + web findings). Produce the FINAL user-facing answer in structured GitHub-flavored Markdown: short diagnosis line first; numbered fix steps with every command in a fenced code block with language tag; use a Markdown table when comparing options/packages/filesystems; prefer battle-tested fixes (mark Reddit-verified ones as such); end with a '### Sources' section listing the most relevant links from the provided material (markdown links). Never invent commands that contradict the research.
 
@@ -25,21 +25,16 @@ export async function synthesizeAnswer({
     webFindings || 'none',
   ].join('\n');
 
-  const data = await generateContent(
+  const content = await chatCompletion(
     {
-      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      // NOTE: no google_search tool — synthesis only.
-      contents: [...toContents(history), { role: 'user', parts: [{ text: prompt }] }],
+      system: SYSTEM_INSTRUCTION,
+      messages: [...toMessages(history), { role: 'user', content: prompt }],
+      temperature: 0.7,
+      maxTokens: 2048,
     },
     { timeoutMs: 25000 }
   );
 
-  const candidate = data?.candidates?.[0];
-  const content = (candidate?.content?.parts || [])
-    .map((p) => p.text || '')
-    .join('')
-    .trim();
-
-  // Sources pass through from the research agent (they carry the grounding links).
+  // Sources pass through from the research agent (Reddit thread links).
   return { content, sources: webSources };
 }

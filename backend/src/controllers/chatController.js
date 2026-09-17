@@ -3,7 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { searchReddit } from '../services/redditService.js';
 import { runWebResearch } from '../services/webResearchAgent.js';
 import { synthesizeAnswer } from '../services/synthesizerAgent.js';
-import { NO_KEY_MESSAGE } from '../services/geminiClient.js';
+import { NO_KEY_MESSAGE } from '../services/groqClient.js';
 
 // Chats are private: a mismatch is reported as 404 so we don't leak existence.
 const findOwnedChat = async (req, res) => {
@@ -62,7 +62,7 @@ export const deleteChat = asyncHandler(async (req, res) => {
 
 // POST /api/chat/:id/messages { content }
 // Multi-agent pipeline: the user message is saved first, then the two research
-// agents (Reddit + Gemini web) run IN PARALLEL, and the synthesizer produces
+// agents (Reddit + web research) run IN PARALLEL, and the synthesizer produces
 // the final answer. The user message stays saved on failure so the client can
 // retry; the assistant message is only added on success.
 export const sendMessage = asyncHandler(async (req, res) => {
@@ -75,7 +75,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
   }
 
   // Fast-fail before doing any work or saving anything.
-  if (!process.env.GEMINI_API_KEY || !process.env.GEMINI_API_KEY.trim()) {
+  if (!process.env.GROQ_API_KEY || !process.env.GROQ_API_KEY.trim()) {
     res.status(503).json({ success: false, message: NO_KEY_MESSAGE });
     return;
   }
@@ -112,7 +112,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     return;
   }
 
-  // Merge web grounding sources with the top 3 Reddit thread URLs, deduped.
+  // Merge web sources with the top 3 Reddit thread URLs, deduped.
   const redditThreads = redditResults
     .slice(0, 3)
     .map((r) => ({ title: r.title, url: r.url }));
