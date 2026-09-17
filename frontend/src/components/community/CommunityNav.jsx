@@ -1,5 +1,5 @@
-import React from 'react';
-import { Home, Plus, MessagesSquare, GitCompareArrows, Bot } from 'lucide-react';
+import React, { useState } from 'react';
+import { Home, Plus, Bot } from 'lucide-react';
 import DistroIcon from '../DistroIcon.jsx';
 import { THEME, LINE, MONO } from '../../theme/designTokens.js';
 import { ChannelAvatar } from './Avatar.jsx';
@@ -44,6 +44,7 @@ const sectionLabel = {
  * `channel` ('all' | 'general' | distroId) marks the active feed filter.
  */
 export default function CommunityNav({ distros, channel, onNavigate, onChannel, onCreatePost }) {
+  const [channelsExpanded, setChannelsExpanded] = useState(false);
   const navLink = (label, icon, to) => (
     <button
       key={label}
@@ -149,13 +150,44 @@ export default function CommunityNav({ distros, channel, onNavigate, onChannel, 
       </button>
 
       {navLink('Home', <Home size={17} />, '/community')}
-      {navLink('Flavours', <MessagesSquare size={17} />, '/flavours')}
-      {navLink('Compare', <GitCompareArrows size={17} />, '/compare')}
-      {navLink('AI Chat', <Bot size={17} />, '/chat')}
 
       <div style={sectionLabel}>Channels</div>
       {channelRow('general', 'General', null)}
-      {distros.map((d) => channelRow(d.id, d.name, d))}
+      {/* Keep the list short: a few channels + an expander */}
+      {(channelsExpanded ? distros : distros.slice(0, 4)).map((d) =>
+        channelRow(d.id, d.name, d)
+      )}
+      {distros.length > 4 && (
+        <button
+          type="button"
+          onClick={() => setChannelsExpanded((v) => !v)}
+          className="transition-colors"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            width: '100%',
+            fontFamily: MONO,
+            fontSize: '0.7rem',
+            fontWeight: 600,
+            color: THEME.textMuted,
+            background: 'transparent',
+            border: 'none',
+            borderRadius: 9999,
+            padding: '7px 14px',
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = THEME.textMain;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = THEME.textMuted;
+          }}
+        >
+          {channelsExpanded ? 'Show fewer' : `Show all (${distros.length})`}
+        </button>
+      )}
 
       <div
         style={{
