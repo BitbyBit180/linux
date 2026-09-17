@@ -155,6 +155,24 @@ export default function FlavoursPage({ onNavigate }) {
 
       {/* Main Content Container */}
       <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24">
+        {/* Find Your Distro quiz CTA */}
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-[#E05A38]/15 via-white/[0.04] to-transparent border border-[#E05A38]/30 rounded-2xl px-5 py-4 backdrop-blur-md">
+          <div>
+            <p className="font-mono text-sm font-bold text-white">
+              Not sure which distro fits you?
+            </p>
+            <p className="font-mono text-xs text-white/55 mt-0.5">
+              Answer 10 quick questions and get a personalized recommendation.
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate?.('/quiz')}
+            className="px-5 py-2 rounded-full font-mono text-xs font-bold text-white bg-[#E05A38] hover:bg-[#b83d25] transition-colors shrink-0"
+          >
+            $ Find Your Distro →
+          </button>
+        </div>
+
         {/* If searching, display search overview banner */}
         {searchQuery && (
           <div className="mb-8 flex items-center justify-between bg-white/[0.04] border border-white/10 rounded-2xl px-5 py-3 backdrop-blur-md">
