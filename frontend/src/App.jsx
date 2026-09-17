@@ -7,6 +7,7 @@ import AuthPage from './pages/AuthPage.jsx';
 import ChatPage from './pages/ChatPage.jsx';
 import CommunityPage from './pages/CommunityPage.jsx';
 import PostDetailPage from './pages/PostDetailPage.jsx';
+import QuizPage from './pages/QuizPage.jsx';
 
 function normalizeRoute(pathname, hash) {
   const path = (pathname || '').toLowerCase();
@@ -24,8 +25,10 @@ function normalizeRoute(pathname, hash) {
   if (path === '/compare' || path.startsWith('/compare?') || h === '#/compare' || h.startsWith('#/compare?')) {
     return path === '/compare' || path.startsWith('/compare?') ? pathname + window.location.search : h.replace('#', '');
   }
-  if (path === '/community' || h === '#/community') {
-    return '/community';
+  if (path === '/community' || h === '#/community' || path.startsWith('/community?') || h.startsWith('#/community?')) {
+    return path.startsWith('/community') || path === '/community'
+      ? pathname + window.location.search
+      : h.replace('#', '');
   }
   if (path.startsWith('/community/')) {
     return pathname;
@@ -38,6 +41,9 @@ function normalizeRoute(pathname, hash) {
   }
   if (path === '/chat' || h === '#/chat') {
     return '/chat';
+  }
+  if (path === '/quiz' || h === '#/quiz') {
+    return '/quiz';
   }
   return '/';
 }
@@ -74,7 +80,9 @@ export default function App() {
   const distroId = isDistroDetail ? currentRoute.replace('/distro/', '').split('/')[0] : null;
   const isLogin = currentRoute === '/login';
   const isChat = currentRoute === '/chat';
-  const isCommunity = currentRoute === '/community';
+  const isQuiz = currentRoute === '/quiz';
+  const isCommunity = currentRoute === '/community' || currentRoute.startsWith('/community?');
+  const communityQuery = isCommunity ? currentRoute.slice('/community'.length) : '';
   const isPostDetail = currentRoute.startsWith('/community/');
   const postId = isPostDetail ? currentRoute.replace('/community/', '').split('/')[0] : null;
 
@@ -90,8 +98,10 @@ export default function App() {
         <AuthPage onAuthSuccess={() => navigate('/chat')} onNavigate={navigate} />
       ) : isChat ? (
         <ChatPage onNavigate={navigate} />
+      ) : isQuiz ? (
+        <QuizPage onNavigate={navigate} />
       ) : isCommunity ? (
-        <CommunityPage onNavigate={navigate} />
+        <CommunityPage query={communityQuery} onNavigate={navigate} />
       ) : isPostDetail ? (
         <PostDetailPage postId={postId} onNavigate={navigate} />
       ) : (
