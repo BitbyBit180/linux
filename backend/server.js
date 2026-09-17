@@ -7,6 +7,7 @@ import flavourRoutes from './src/routes/flavourRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
 import chatRoutes from './src/routes/chatRoutes.js';
 import communityRoutes from './src/routes/communityRoutes.js';
+import quizRoutes from './src/routes/quizRoutes.js';
 import { notFound, errorHandler } from './src/middleware/errorMiddleware.js';
 
 const app = express();
@@ -32,6 +33,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 // community -> Reddit-style per-distro channels (posts/comments/votes, all protected)
 app.use('/api/community', communityRoutes);
+// quiz -> AI-powered "Find Your Distro" recommendation (public, rule-based fallback)
+app.use('/api/quiz', quizRoutes);
 
 // 404 + error handler (must be last)
 app.use(notFound);
