@@ -146,14 +146,15 @@ export default function Navbar({
             )}
           </div>
 
-          {/* Links to the right of the search box: Compare, Community & AI Chat */}
-          {['Compare', 'Community', 'AI Chat'].map((item) => (
+          {/* Links to the right of the search box: Compare, Quiz, Community & AI Chat */}
+          {['Compare', 'Find Your Distro', 'Community', 'AI Chat'].map((item) => (
             <a
               key={item}
-              href={item === 'Compare' ? '/compare' : item === 'Community' ? '/community' : item === 'AI Chat' ? '/chat' : '#'}
+              href={item === 'Compare' ? '/compare' : item === 'Find Your Distro' ? '/quiz' : item === 'Community' ? '/community' : item === 'AI Chat' ? '/chat' : '#'}
               onClick={(e) => {
                 e.preventDefault();
                 if (item === 'Compare') onNavigate?.('/compare');
+                else if (item === 'Find Your Distro') onNavigate?.('/quiz');
                 else if (item === 'Community') onNavigate?.('/community');
                 else if (item === 'AI Chat') onNavigate?.('/chat');
               }}
@@ -182,23 +183,26 @@ export default function Navbar({
           ))}
         </>
       ) : (
-        /* Hero Mode: Distros, Compare, Docs, Community, AI Chat, and Get Started button */
+        /* Hero Mode: Distros, Compare, Find Your Distro, Community, AI Chat, and Get Started button */
         <>
-          {['Distros', 'Compare', 'Docs', 'Community', 'AI Chat'].map((item) => {
+          {['Distros', 'Compare', 'Find Your Distro', 'Community', 'AI Chat'].map((item) => {
             const isDistros = item === 'Distros';
             const isCompare = item === 'Compare';
+            const isQuiz = item === 'Find Your Distro';
             const isCommunity = item === 'Community';
             const isAIChat = item === 'AI Chat';
             return (
               <a
                 key={item}
-                href={isDistros ? '/flavours' : isCompare ? '/compare' : isCommunity ? '/community' : isAIChat ? '/chat' : '#'}
+                href={isDistros ? '/flavours' : isCompare ? '/compare' : isQuiz ? '/quiz' : isCommunity ? '/community' : isAIChat ? '/chat' : '#'}
                 onClick={(e) => {
                   e.preventDefault();
                   if (isDistros) {
                     onNavigate?.('/flavours');
                   } else if (isCompare) {
                     onNavigate?.('/compare');
+                  } else if (isQuiz) {
+                    onNavigate?.('/quiz');
                   } else if (isCommunity) {
                     onNavigate?.('/community');
                   } else if (isAIChat) {
