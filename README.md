@@ -97,6 +97,7 @@ In production set `VITE_API_URL=https://your-api-host/api` (in `frontend/.env`) 
 | GET | `/api/flavours/categories` | `["All", ...]` |
 | GET | `/api/distros/:id` | by `distroId` or name — includes full `installGuide` (Detail page) |
 | GET | `/api/distros/compare?ids=a,b,c,d` | side-by-side spec comparison (max 4, ordered) |
+| POST | `/api/quiz/recommend` | AI "Find Your Distro" pick (public; `{ answers[], shortlist[] }` → `{ ai, winner, runnersUp, explanation, strengths, tip }` with rule-based fallback) |
 | POST/PUT/DELETE | `/api/flavours...`, `/api/distros...` | admin CRUD per collection |
 
 ### Auth & AI chat (JWT-protected)
