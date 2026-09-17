@@ -656,6 +656,7 @@ export default function HeroSection({ onNavigate }) {
           Every distro has a story. Find yours.
         </p>
         <button
+          onClick={() => onNavigate?.('/quiz')}
           style={{
             background: THEME.accent,
             color: THEME.textMain,
