@@ -1,6 +1,6 @@
 // AI recommendation for the "Find Your Distro" quiz.
 // POSTs the user's readable Q&A + the rule-based shortlist; the backend
-// asks Gemini for a personalized winner + explanation. Throws on any
+// asks Groq for a personalized winner + explanation. Throws on any
 // failure so the caller can fall back to local scoring (UI never breaks).
 
 // Backend base URL. In dev, Vite proxies /api -> http://localhost:5000 (see vite.config.js).

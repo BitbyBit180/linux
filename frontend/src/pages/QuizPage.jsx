@@ -17,7 +17,7 @@ import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
 
 /**
  * "Find Your Distro" — a short wizard with AI-personalized results.
- * Rule-based scoring gives an instant top-3; Gemini then re-ranks and
+ * Rule-based scoring gives an instant top-3; Groq then re-ranks and
  * explains the pick. If the AI is unreachable, the classic match stands.
  */
 export default function QuizPage({ onNavigate }) {

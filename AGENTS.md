@@ -15,7 +15,7 @@ No tests, linter, typecheck, or CI exist. Verify with `vite build` (frontend) an
 ## Gotchas
 
 - **Port 5000 busy (`EADDRINUSE`)**: `node --watch` keeps old servers alive. `fuser -k 5000/tcp` or kill the stale `node server.js` before restarting.
-- **Backend needs MongoDB + `.env`**: copy `backend/.env.example` → `backend/.env`. `MONGO_URI` defaults to local; `GEMINI_API_KEY` enables chat/quiz AI (both degrade gracefully without it — quiz returns `ai:false`, chat returns 503).
+- **Backend needs MongoDB + `.env`**: copy `backend/.env.example` → `backend/.env`. `MONGO_URI` defaults to local; `GROQ_API_KEY` enables chat/quiz AI (both degrade gracefully without it — quiz returns `ai:false`, chat returns 503).
 - **Field-name mapping**: frontend `id` / `init` / `installGuide` ↔ DB `distroId` / `initSystem` (`init` is a reserved Mongoose method) / `installation`. Controllers already translate both directions — keep using their helpers.
 
 ## Architecture
@@ -24,6 +24,6 @@ No tests, linter, typecheck, or CI exist. Verify with `vite build` (frontend) an
 - **API access**: `import.meta.env.VITE_API_URL || '/api'`; dev proxies `/api` → `:5000` (`frontend/vite.config.js`). Every `frontend/src/services/*` module follows fetch-then-fallback-to-static-data — preserve that pattern so the UI never breaks offline.
 - **Two collections, one key**: `flavours` (lean cards) vs `distros` (full detail + guides), linked by `distroId`. Seed keeps them in sync.
 - **Quiz scoring lives in one place**: `frontend/src/utils/distroQuiz.js`. The backend quiz endpoint (`POST /api/quiz/recommend`) trusts the client's shortlist and only validates ids — do not duplicate the scoring table server-side.
-- **Gemini via plain `fetch`** (`backend/src/services/geminiClient.js`) — no SDK dependency. Model from `GEMINI_MODEL`.
+- **Groq via plain `fetch`** (`backend/src/services/groqClient.js`) — OpenAI-compatible, no SDK dependency. Model from `GROQ_MODEL`.
 - **Styling**: shared tokens in `frontend/src/theme/designTokens.js` (`THEME`, `MONO`, `LINE`); one burnt-orange accent, JetBrains Mono, inline-style components. Don't hardcode hexes.
 - **Data mirrors**: `frontend/src/data/distros.js` and `backend/src/data/distros.js` both hold the 14 seeded distros — keep them in sync when adding one.

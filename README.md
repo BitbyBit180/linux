@@ -102,7 +102,7 @@ In production set `VITE_API_URL=https://your-api-host/api` (in `frontend/.env`) 
 
 ### Auth & AI chat (JWT-protected)
 
-Set `JWT_SECRET` and `GEMINI_API_KEY` in `backend/.env` (optional `GEMINI_MODEL`, default `gemini-3.6-flash`).
+Set `JWT_SECRET` and `GROQ_API_KEY` in `backend/.env` (optional `GROQ_MODEL`, default `openai/gpt-oss-120b`).
 
 | Method | Path | Notes |
 |---|---|---|
@@ -112,7 +112,7 @@ Set `JWT_SECRET` and `GEMINI_API_KEY` in `backend/.env` (optional `GEMINI_MODEL`
 | GET/POST | `/api/chat` | list chats / create empty chat |
 | GET/DELETE | `/api/chat/:id` | full chat / delete chat |
 | PUT | `/api/chat/:id/rename` `{ title }` | rename a chat |
-| POST | `/api/chat/:id/messages` `{ content }` | runs the pipeline: Reddit agent + web-research agent (parallel, Gemini with Google-Search grounding) → synthesizer; returns the assistant reply with sources |
+| POST | `/api/chat/:id/messages` `{ content }` | runs the pipeline: Reddit agent + web-research agent (parallel, Groq) → synthesizer; returns the assistant reply with sources |
 
 ### Community (JWT-protected, per-distro channels)
 
