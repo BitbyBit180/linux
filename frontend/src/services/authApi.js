@@ -117,3 +117,12 @@ export async function resetPassword(token, password) {
   });
   return json;
 }
+
+/** POST /api/auth/verify-reset-token { token } -> { message } (does not consume the code) */
+export async function verifyResetToken(token) {
+  const json = await request('/auth/verify-reset-token', {
+    method: 'POST',
+    body: { token },
+  });
+  return json;
+}

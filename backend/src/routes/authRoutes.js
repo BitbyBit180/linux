@@ -4,6 +4,7 @@ import {
   login,
   getMe,
   forgotPassword,
+  verifyResetToken,
   resetPassword,
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -21,6 +22,7 @@ const router = express.Router();
 router.post('/register', authLimiter, register);
 router.post('/login', authLimiter, login);
 router.post('/forgot-password', authLimiter, forgotPassword);
+router.post('/verify-reset-token', authLimiter, verifyResetToken);
 router.post('/reset-password', authLimiter, resetPassword);
 router.get('/me', protect, getMe);
 

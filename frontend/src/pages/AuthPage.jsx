@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Bot, AlertCircle } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import { useAuth } from '../hooks/useAuth.js';
-import { forgotPassword as apiForgot, resetPassword as apiReset } from '../services/authApi.js';
+import { forgotPassword as apiForgot, resetPassword as apiReset, verifyResetToken as apiVerify } from '../services/authApi.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
 
 const inputStyle = {
@@ -56,8 +56,90 @@ function AuthField({ label, type, value, onChange, autoFocus, autoComplete }) {
 }
 
 /**
- * Forgot / reset sub-views: request a token by email, then redeem it with a
- * new password. Reuses AuthField + the card's error/notice styling.
+ * Six single-digit OTP boxes: auto-advance, backspace-to-go-back, full-code
+ * paste. Calls `onComplete(code)` once all six are filled.
+ */
+function OtpInput({ value, onChange, onComplete, disabled }) {
+  const boxes = useRef([]);
+
+  const digits = (value + '      ').slice(0, 6).split('');
+
+  const setDigit = (i, d) => {
+    const next = digits.slice();
+    next[i] = d;
+    onChange(next.join('').trim());
+  };
+
+  const handleChange = (i, raw) => {
+    const d = raw.replace(/\D/g, '').slice(-1);
+    if (!d) return;
+    setDigit(i, d);
+    if (i < 5) boxes.current[i + 1]?.focus();
+    const filled = digits.slice();
+    filled[i] = d;
+    if (filled.every((x) => x !== ' ' && x !== '')) onComplete?.(filled.join(''));
+  };
+
+  const handleKeyDown = (i, e) => {
+    if (e.key === 'Backspace' && !digits[i].trim()) {
+      e.preventDefault();
+      if (i > 0) {
+        setDigit(i - 1, ' ');
+        boxes.current[i - 1]?.focus();
+      }
+    }
+  };
+
+  const handlePaste = (e) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!pasted) return;
+    e.preventDefault();
+    onChange(pasted);
+    boxes.current[Math.min(pasted.length, 5)]?.focus();
+    if (pasted.length === 6) onComplete?.(pasted);
+  };
+
+  return (
+    <div className="flex items-center justify-center" style={{ gap: 8 }} onPaste={handlePaste}>
+      {digits.map((d, i) => (
+        <input
+          key={i}
+          ref={(el) => {
+            boxes.current[i] = el;
+          }}
+          type="text"
+          inputMode="numeric"
+          autoComplete={i === 0 ? 'one-time-code' : 'off'}
+          maxLength={1}
+          disabled={disabled}
+          value={d.trim()}
+          autoFocus={i === 0}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          onFocus={(e) => e.target.select()}
+          aria-label={`Digit ${i + 1} of 6`}
+          style={{
+            width: 44,
+            height: 52,
+            textAlign: 'center',
+            fontFamily: MONO,
+            fontSize: '1.3rem',
+            fontWeight: 800,
+            color: THEME.textMain,
+            background: 'rgba(22, 27, 34, 0.65)',
+            border: `1px solid ${d.trim() ? `${THEME.accent}88` : LINE}`,
+            borderRadius: 10,
+            outline: 'none',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Forgot / reset sub-views: request a code by email, enter it in six boxes,
+ * and only then do the new-password fields appear.
  */
 function ForgotResetView({
   view,
@@ -67,10 +149,14 @@ function ForgotResetView({
   setResetToken,
   password,
   setPassword,
+  confirmPassword,
+  setConfirmPassword,
+  otpVerified,
   busy,
   error,
   notice,
   onForgot,
+  onVerify,
   onReset,
   onBack,
 }) {
@@ -128,29 +214,50 @@ function ForgotResetView({
           </button>
         </form>
       ) : (
-        <form onSubmit={onReset}>
+        <div>
+          <p
+            style={{
+              fontFamily: MONO,
+              fontSize: '0.74rem',
+              color: THEME.textMuted,
+              textAlign: 'center',
+              margin: '0 0 14px',
+            }}
+          >
+            Enter the 6-digit code sent to your email.
+          </p>
           <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Reset token</label>
-            <input
-              type="text"
+            <OtpInput
               value={resetToken}
-              onChange={(e) => setResetToken(e.target.value)}
-              placeholder="Paste the token from the email / server log"
-              autoFocus
-              autoComplete="one-time-code"
-              style={inputStyle}
+              onChange={setResetToken}
+              onComplete={onVerify}
+              disabled={busy || otpVerified}
             />
           </div>
-          <AuthField label="New password" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
           {error && (
-            <p style={{ fontFamily: MONO, fontSize: '0.72rem', color: THEME.accent, margin: '0 0 12px' }}>
+            <p style={{ fontFamily: MONO, fontSize: '0.72rem', color: THEME.accent, margin: '0 0 12px', textAlign: 'center' }}>
               {error}
             </p>
           )}
-          <button type="submit" disabled={busy} style={submitStyle}>
-            {busy ? 'Updating…' : 'Set new password'}
-          </button>
-        </form>
+          {!otpVerified ? (
+            <button
+              type="button"
+              onClick={() => onVerify()}
+              disabled={busy || resetToken.trim().length !== 6}
+              style={submitStyle}
+            >
+              {busy ? 'Verifying…' : 'Verify code'}
+            </button>
+          ) : (
+            <form onSubmit={onReset}>
+              <AuthField label="New password" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
+              <AuthField label="Confirm new password" type="password" value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password" />
+              <button type="submit" disabled={busy} style={submitStyle}>
+                {busy ? 'Updating…' : 'Set new password'}
+              </button>
+            </form>
+          )}
+        </div>
       )}
       <p style={{ fontFamily: MONO, fontSize: '0.68rem', color: THEME.textMuted, textAlign: 'center', margin: '14px 0 0' }}>
         <button type="button" onClick={onBack} style={backStyle}>
@@ -170,7 +277,9 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
   const { login, register } = useAuth();
   const [mode, setMode] = useState('login');
   const [view, setView] = useState('auth'); // auth | forgot | reset
-  const [resetToken, setResetToken] = useState('');
+  const [resetToken, setResetToken] = useState(''); // 6-digit OTP
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [otpVerified, setOtpVerified] = useState(false);
   const [notice, setNotice] = useState(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -201,6 +310,10 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
     try {
       const json = await apiForgot(email.trim());
       setNotice(json.message);
+      setResetToken('');
+      setOtpVerified(false);
+      setPassword('');
+      setConfirmPassword('');
       setView('reset');
     } catch (err) {
       setError(err.message || 'Could not start the reset. Please try again.');
@@ -212,8 +325,16 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
   const handleReset = async (e) => {
     e.preventDefault();
     if (busy) return;
-    if (!resetToken.trim() || password.length < 6) {
-      setError('Paste the token and choose a 6+ character password.');
+    if (!otpVerified) {
+      setError('Verify the 6-digit code first.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Choose a 6+ character password.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
     setBusy(true);
@@ -222,11 +343,31 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
       const json = await apiReset(resetToken.trim(), password);
       setNotice(json.message);
       setPassword('');
+      setConfirmPassword('');
       setResetToken('');
+      setOtpVerified(false);
       setView('auth');
       setMode('login');
     } catch (err) {
-      setError(err.message || 'Reset failed. The token may have expired.');
+      setError(err.message || 'Reset failed. The code may have expired.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleVerifyOtp = async (code) => {
+    const otp = (code ?? resetToken).trim();
+    if (!/^\d{6}$/.test(otp) || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiVerify(otp);
+      setResetToken(otp);
+      setOtpVerified(true);
+      setNotice('Code verified — choose a new password.');
+    } catch (err) {
+      setOtpVerified(false);
+      setError(err.message || 'Code is incorrect or expired.');
     } finally {
       setBusy(false);
     }
@@ -526,10 +667,14 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
               setResetToken={setResetToken}
               password={password}
               setPassword={setPassword}
+              confirmPassword={confirmPassword}
+              setConfirmPassword={setConfirmPassword}
+              otpVerified={otpVerified}
               busy={busy}
               error={error}
               notice={notice}
               onForgot={handleForgot}
+              onVerify={handleVerifyOtp}
               onReset={handleReset}
               onBack={() => {
                 setView('auth');

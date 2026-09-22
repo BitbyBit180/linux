@@ -75,6 +75,11 @@ export const getMe = asyncHandler(async (req, res) => {
 
 const RESET_TTL_MS = 15 * 60 * 1000;
 
+// 6-digit numeric OTP. Single-use, 15-min expiry, hashed at rest, and the
+// auth limiter caps guessing at 30 attempts / 15 min per IP.
+const newOtp = () => String(crypto.randomInt(100000, 1000000));
+const hashOtp = (otp) => crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
+
 // POST /api/auth/forgot-password { email } — always 200 with a generic
 // message (no account enumeration). When the account exists, stores a
 // hashed token and delivers the raw token via the mailer hook.
@@ -84,41 +89,62 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   if (EMAIL_RE.test(emailNorm)) {
     const user = await User.findOne({ email: emailNorm });
     if (user) {
-      const token = crypto.randomBytes(32).toString('hex');
-      user.resetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const otp = newOtp();
+      user.resetTokenHash = hashOtp(otp);
       user.resetTokenExpiry = new Date(Date.now() + RESET_TTL_MS);
       await user.save();
       try {
-        await deliverResetToken({ email: emailNorm, token });
+        await deliverResetToken({ email: emailNorm, token: otp });
       } catch (err) {
         user.resetTokenHash = null;
         user.resetTokenExpiry = null;
         await user.save();
         res.status(503);
-        throw new Error(err.message || 'Could not send the reset token. Please try again.');
+        throw new Error(err.message || 'Could not send the reset code. Please try again.');
       }
     }
   }
   res.json({ success: true, message: generic });
 });
 
-// POST /api/auth/reset-password { token, password } — verifies the token
-// (constant-time compare on hashes + expiry) and sets the new password.
-export const resetPassword = asyncHandler(async (req, res) => {
+// POST /api/auth/verify-reset-token { token } — checks the 6-digit code
+// without consuming it, so the UI can reveal the password fields only
+// after a correct OTP.
+export const verifyResetToken = asyncHandler(async (req, res) => {
   const token = String(req.body?.token || '').trim();
-  const password = req.body?.password || '';
-  if (!token || password.length < 6) {
+  if (!/^\d{6}$/.test(token)) {
     res.status(400);
-    throw new Error('A valid token and a 6+ character password are required');
+    throw new Error('Enter the 6-digit code from the email');
   }
-  const hash = crypto.createHash('sha256').update(token).digest('hex');
+  const hash = hashOtp(token);
   const user = await User.findOne({
     resetTokenHash: hash,
     resetTokenExpiry: { $gt: new Date() },
   });
   if (!user || !crypto.timingSafeEqual(Buffer.from(user.resetTokenHash), Buffer.from(hash))) {
     res.status(400);
-    throw new Error('Reset token is invalid or expired');
+    throw new Error('Code is incorrect or expired');
+  }
+  res.json({ success: true, message: 'Code verified — choose a new password.' });
+});
+
+// POST /api/auth/reset-password { token, password } — verifies the code
+// (constant-time compare on hashes + expiry) and sets the new password.
+export const resetPassword = asyncHandler(async (req, res) => {
+  const token = String(req.body?.token || '').trim();
+  const password = req.body?.password || '';
+  if (!/^\d{6}$/.test(token) || password.length < 6) {
+    res.status(400);
+    throw new Error('A 6-digit code and a 6+ character password are required');
+  }
+  const hash = hashOtp(token);
+  const user = await User.findOne({
+    resetTokenHash: hash,
+    resetTokenExpiry: { $gt: new Date() },
+  });
+  if (!user || !crypto.timingSafeEqual(Buffer.from(user.resetTokenHash), Buffer.from(hash))) {
+    res.status(400);
+    throw new Error('Code is incorrect or expired');
   }
   user.passwordHash = await bcrypt.hash(password, 10);
   user.resetTokenHash = null;

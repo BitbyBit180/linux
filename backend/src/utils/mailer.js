@@ -41,9 +41,9 @@ export async function deliverResetToken({ email, token }) {
       text: [
         'Someone requested a password reset for your DistroPedia account.',
         '',
-        `Your reset token (valid 15 minutes): ${token}`,
+        `Your 6-digit code (valid 15 minutes): ${token}`,
         '',
-        'Paste it on the reset page with your new password. If this was not you, ignore this email.',
+        'Enter it on the reset page, then choose a new password. If this was not you, ignore this email.',
       ].join('\n'),
     });
     console.log(`[auth] reset email sent to ${email}`);
@@ -55,5 +55,5 @@ export async function deliverResetToken({ email, token }) {
       'Password-reset email is not configured. Set SMTP_HOST/USER/PASS in backend/.env.'
     );
   }
-  console.log(`[auth] password-reset token for ${email}: ${token} (valid 15 min)`);
+  console.log(`[auth] password-reset code for ${email}: ${token} (valid 15 min)`);
 }
