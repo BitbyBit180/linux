@@ -64,6 +64,8 @@ export default function PostCard({
   isOwner = false,
   onEdit,
   onDelete,
+  hideDivider = false,
+  voteDisabled = false,
 }) {
   const [shared, setShared] = useState(false);
   const shareTimer = useRef(null);
@@ -92,7 +94,10 @@ export default function PostCard({
     <article
       onClick={() => onOpen?.(post)}
       className="cursor-pointer"
-      style={{ padding: '14px 4px', borderBottom: `1px solid ${LINE}` }}
+      style={{
+        padding: '14px 4px',
+        borderBottom: hideDivider ? 'none' : `1px solid ${LINE}`,
+      }}
     >
       {/* Meta: channel avatar + d/name • author • time */}
       <div className="flex items-center" style={{ gap: 8, marginBottom: 8 }}>
@@ -186,7 +191,7 @@ export default function PostCard({
 
       {/* Action bar */}
       <div className="flex items-center flex-wrap" style={{ gap: 8, marginTop: 12 }}>
-        <VotePill score={post.score} userVote={post.userVote} onVote={onVote} />
+        <VotePill score={post.score} userVote={post.userVote} onVote={onVote} disabled={voteDisabled} />
         <RowAction
           icon={<MessageSquare size={14} />}
           label={`${post.commentCount ?? 0} ${

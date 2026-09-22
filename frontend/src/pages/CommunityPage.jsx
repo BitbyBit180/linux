@@ -19,7 +19,7 @@ const GLASS = {
   background: 'rgba(28, 34, 41, 0.55)',
   backdropFilter: 'blur(28px) saturate(170%)',
   WebkitBackdropFilter: 'blur(28px) saturate(170%)',
-  border: '1px solid rgba(255, 255, 255, 0.14)',
+  border: `1px solid ${LINE}`,
 };
 
 const SORTS = [
@@ -269,7 +269,9 @@ export default function CommunityPage({ onNavigate }) {
 
   const [composerOpen, setComposerOpen] = useState(false);
   const [posting, setPosting] = useState(false);
-  const [votingId, setVotingId] = useState(null);
+  // Per-post vote locks: only one in-flight vote per post, so up + down can
+  // never overlap on the same pill (different posts may vote in parallel).
+  const [votingIds, setVotingIds] = useState(() => new Set());
 
   const requestIdRef = useRef(0);
 
@@ -318,17 +320,21 @@ export default function CommunityPage({ onNavigate }) {
   /* --------------------------------- actions -------------------------------- */
 
   const handleVote = async (post, value) => {
-    const prevScore = post.score;
-    const prevVote = post.userVote;
-    // Optimistic update
+    // Lock this post's pill while a vote is in flight — without this, rapid
+    // up-then-down clicks fire two concurrent requests with a stale prevVote
+    // and the score settles in the wrong state (looks like both votes stuck).
+    if (votingIds.has(post.id)) return;
+    const prevVote = posts.find((p) => p.id === post.id)?.userVote ?? post.userVote;
+    const prevScore = posts.find((p) => p.id === post.id)?.score ?? post.score;
+    // Optimistic update, computed from the latest rendered state
     setPosts((prev) =>
       prev.map((p) =>
         p.id === post.id
-          ? { ...p, score: prevScore + (value - prevVote), userVote: value }
+          ? { ...p, score: (p.score ?? 0) + (value - (p.userVote ?? 0)), userVote: value }
           : p
       )
     );
-    setVotingId(post.id);
+    setVotingIds((prev) => new Set(prev).add(post.id));
     try {
       const data = await votePost(post.id, value);
       // Reconcile with the server's authoritative numbers
@@ -352,7 +358,11 @@ export default function CommunityPage({ onNavigate }) {
       );
       setError(err.message || 'Vote failed. Please try again.');
     } finally {
-      setVotingId(null);
+      setVotingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(post.id);
+        return next;
+      });
     }
   };
 
@@ -510,7 +520,7 @@ export default function CommunityPage({ onNavigate }) {
       )}
 
       {/* Feed: flat rows inside one glass panel (Reddit list style) */}
-      <div style={{ ...GLASS, borderRadius: 18, padding: '6px 18px 2px' }}>
+      <div style={{ ...GLASS, borderRadius: 18, padding: '6px 18px 6px', overflow: 'hidden' }}>
         {loading ? (
           <p
             style={{
@@ -548,7 +558,7 @@ export default function CommunityPage({ onNavigate }) {
             </p>
           </div>
         ) : (
-          posts.map((post) => (
+          posts.map((post, i) => (
             <PostCard
               key={post.id}
               post={post}
@@ -557,6 +567,8 @@ export default function CommunityPage({ onNavigate }) {
               onVote={(value) => handleVote(post, value)}
               isOwner={false}
               onDelete={handleDeletePost}
+              hideDivider={i === posts.length - 1}
+              voteDisabled={votingIds.has(post.id)}
             />
           ))
         )}

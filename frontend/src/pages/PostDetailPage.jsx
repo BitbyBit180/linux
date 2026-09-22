@@ -51,7 +51,7 @@ const GLASS = {
   background: 'rgba(28, 34, 41, 0.55)',
   backdropFilter: 'blur(28px) saturate(170%)',
   WebkitBackdropFilter: 'blur(28px) saturate(170%)',
-  border: '1px solid rgba(255, 255, 255, 0.14)',
+  border: `1px solid ${LINE}`,
 };
 
 /* ----------------------------- code block (dp) ----------------------------- */
@@ -488,6 +488,10 @@ export default function PostDetailPage({ postId, onNavigate }) {
   const [commentSearch, setCommentSearch] = useState('');
   const [shared, setShared] = useState(false);
   const shareTimer = useRef(null);
+  // Per-target vote locks: only one in-flight vote per post/comment, so up +
+  // down can never overlap and optimistic scores can't go stale.
+  const [votingPost, setVotingPost] = useState(false);
+  const [votingCommentIds, setVotingCommentIds] = useState(() => new Set());
 
   const [channelStats, setChannelStats] = useState(null);
 
@@ -541,9 +545,10 @@ export default function PostDetailPage({ postId, onNavigate }) {
   /* --------------------------------- actions -------------------------------- */
 
   const handleVote = async (value) => {
-    if (!post) return;
+    if (!post || votingPost) return;
     const prevScore = post.score;
     const prevVote = post.userVote;
+    setVotingPost(true);
     setPost({ ...post, score: prevScore + (value - prevVote), userVote: value });
     try {
       const data = await votePost(post.id, value);
@@ -557,6 +562,8 @@ export default function PostDetailPage({ postId, onNavigate }) {
       }
       setPost((p) => (p ? { ...p, score: prevScore, userVote: prevVote } : p));
       setError(err.message || 'Vote failed. Please try again.');
+    } finally {
+      setVotingPost(false);
     }
   };
 
@@ -679,10 +686,12 @@ export default function PostDetailPage({ postId, onNavigate }) {
   };
 
   const handleCommentVote = async (commentId, value) => {
+    if (votingCommentIds.has(commentId)) return;
     const target = findComment(comments, commentId);
     if (!target) return;
     const prevScore = target.score;
     const prevVote = target.userVote;
+    setVotingCommentIds((prev) => new Set(prev).add(commentId));
     setComments((prev) =>
       mapComments(prev, (c) =>
         c.id === commentId
@@ -708,6 +717,12 @@ export default function PostDetailPage({ postId, onNavigate }) {
         return;
       }
       setError(err.message || 'Vote failed. Please try again.');
+    } finally {
+      setVotingCommentIds((prev) => {
+        const next = new Set(prev);
+        next.delete(commentId);
+        return next;
+      });
     }
   };
 
@@ -938,6 +953,7 @@ export default function PostDetailPage({ postId, onNavigate }) {
                     userVote={post.userVote}
                     onVote={handleVote}
                     size={17}
+                    disabled={votingPost}
                   />
                   <RowAction
                     icon={<MessageSquare size={14} />}
@@ -976,12 +992,16 @@ export default function PostDetailPage({ postId, onNavigate }) {
 
             {/* Comments section */}
             <section id="community-comments" style={{ marginTop: 24 }}>
-              {/* "Join the conversation" composer */}
+              {/* "Join the conversation" composer — single border, single radius:
+                  the wrapper owns the frame so the textarea never double-draws
+                  or overlaps a mismatched pill radius when it expands. */}
               <div
                 style={{
                   border: `1px solid ${commentDraft ? `${THEME.accent}55` : LINE}`,
-                  borderRadius: 9999,
-                  transition: 'border-color 0.2s ease',
+                  borderRadius: commentDraft ? 16 : 9999,
+                  transition: 'border-color 0.2s ease, border-radius 0.2s ease',
+                  background: 'rgba(20, 24, 32, 0.45)',
+                  overflow: 'hidden',
                 }}
               >
                 <textarea
@@ -992,10 +1012,11 @@ export default function PostDetailPage({ postId, onNavigate }) {
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
+                    display: 'block',
                     resize: 'none',
-                    background: 'rgba(20, 24, 32, 0.45)',
+                    background: 'transparent',
                     border: 'none',
-                    borderRadius: commentDraft ? 12 : 9999,
+                    borderRadius: 0,
                     outline: 'none',
                     padding: commentDraft ? '12px 16px' : '10px 18px',
                     fontFamily: MONO,
@@ -1201,6 +1222,7 @@ export default function PostDetailPage({ postId, onNavigate }) {
                     onReply={handleReply}
                     onEdit={handleEditComment}
                     onDelete={handleDeleteComment}
+                    voteDisabled={votingCommentIds.has(c.id)}
                   />
                 ))
               )}

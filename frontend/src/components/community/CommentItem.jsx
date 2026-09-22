@@ -43,26 +43,37 @@ function TextAction({ label, onClick, disabled, accent }) {
 }
 
 // Inline vote control (▲ score ▼) used within comment action rows
-function InlineVote({ score, userVote, onVote }) {
+function InlineVote({ score, userVote, onVote, disabled = false }) {
   const voteBtn = (dir) => {
-    const active = userVote === (dir === 'up' ? 1 : -1);
+    const dirValue = dir === 'up' ? 1 : -1;
+    const active = userVote === dirValue;
     return (
       <button
         type="button"
         title={dir === 'up' ? 'Upvote' : 'Downvote'}
         aria-label={`Upvote ${dir === 'down' ? 'down' : ''}comment`.trim()}
-        onClick={() => onVote?.(commentVoteValue(userVote, dir))}
+        aria-pressed={active}
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          onVote?.(commentVoteValue(userVote, dir));
+        }}
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: 20,
-          height: 18,
-          borderRadius: 6,
-          border: 'none',
-          background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+          width: 22,
+          height: 20,
+          borderRadius: 9999,
+          border: active ? `1px solid ${dir === 'up' ? 'rgba(224, 90, 56, 0.5)' : 'rgba(90, 140, 255, 0.5)'}` : '1px solid transparent',
+          background: active
+            ? dir === 'up'
+              ? 'rgba(224, 90, 56, 0.16)'
+              : 'rgba(90, 140, 255, 0.16)'
+            : 'transparent',
           color: active ? scoreColor(dir === 'up' ? 1 : -1) : THEME.textMuted,
-          cursor: 'pointer',
+          cursor: disabled ? 'wait' : 'pointer',
+          opacity: disabled && !active ? 0.5 : 1,
           padding: 0,
         }}
       >
@@ -129,6 +140,7 @@ export default function CommentItem({
   onEdit,
   onDelete,
   depth = 0,
+  voteDisabled = false,
 }) {
   const isOwner = user?.id !== undefined && comment.author?.id === user.id;
 
@@ -212,6 +224,7 @@ export default function CommentItem({
             score={comment.score}
             userVote={comment.userVote}
             onVote={(v) => onVote?.(comment.id, v)}
+            disabled={voteDisabled}
           />
         </div>
 
@@ -335,6 +348,7 @@ export default function CommentItem({
                     onEdit={onEdit}
                     onDelete={onDelete}
                     depth={depth + 1}
+                    voteDisabled={voteDisabled}
                   />
                 ))}
               </div>

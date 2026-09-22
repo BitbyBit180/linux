@@ -8,7 +8,7 @@ const GLASS = {
   background: 'rgba(28, 34, 41, 0.55)',
   backdropFilter: 'blur(28px) saturate(170%)',
   WebkitBackdropFilter: 'blur(28px) saturate(170%)',
-  border: '1px solid rgba(255, 255, 255, 0.14)',
+  border: `1px solid ${LINE}`,
 };
 
 const navBtn = (active) => ({

@@ -137,7 +137,7 @@ export function RecentPosts({ onOpen }) {
       {recent?.length === 0 && (
         <p style={{ ...railText, margin: 0, fontSize: '0.66rem' }}>Nothing posted yet.</p>
       )}
-      {recent?.map((p) => (
+      {recent?.map((p, i) => (
         <button
           key={p.id}
           type="button"
@@ -146,7 +146,7 @@ export function RecentPosts({ onOpen }) {
           style={{
             background: 'none',
             border: 'none',
-            borderTop: `1px solid ${LINE}`,
+            borderTop: i === 0 ? 'none' : `1px solid ${LINE}`,
             padding: '10px 2px',
             cursor: 'pointer',
           }}

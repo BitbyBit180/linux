@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { THEME } from '../../theme/designTokens.js';
+import { THEME, LINE } from '../../theme/designTokens.js';
 
 function useMedia(query) {
   const [matches, setMatches] = useState(
@@ -74,7 +74,8 @@ export function RailCard({ label, action, children }) {
         background: 'rgba(28, 34, 41, 0.55)',
         backdropFilter: 'blur(28px) saturate(170%)',
         WebkitBackdropFilter: 'blur(28px) saturate(170%)',
-        border: '1px solid rgba(255, 255, 255, 0.14)',
+        border: `1px solid ${LINE}`,
+        overflow: 'hidden',
       }}
     >
       {(label || action) && (
