@@ -647,10 +647,12 @@ export default function HeroSection({ onNavigate }) {
         <p
           style={{
             fontFamily: 'monospace',
-            fontSize: '1.6rem',
+            fontSize: 'clamp(1.05rem, 4.5vw, 1.6rem)',
             color: THEME.textMain,
             letterSpacing: '-0.4px',
             textAlign: 'center',
+            padding: '0 20px',
+            margin: 0,
           }}
         >
           Every distro has a story. Find yours.

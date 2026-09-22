@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import AuthPage from './AuthPage.jsx';
 import { useAuth } from '../hooks/useAuth.js';
+import useMedia from '../hooks/useMedia.js';
 import {
   listChats,
   createChat,
@@ -666,6 +667,11 @@ function Sidebar({
   onNavigateHome,
   collapsed,
   onToggleCollapse,
+  // Mobile drawer mode: sidebar becomes a fixed overlay instead of squeezing
+  // the conversation into ~80px. `open` controls visibility, `onClose` backs out.
+  overlay = false,
+  open = false,
+  onClose,
 }) {
   const [hoveredId, setHoveredId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -686,20 +692,40 @@ function Sidebar({
     setEditingId(null);
   };
 
-  const asideStyle = {
-    position: 'relative',
-    zIndex: 10,
-    flexShrink: 0,
-    width: collapsed ? 60 : 272,
-    height: 'calc(100% - 20px)',
-    margin: 10,
-    marginRight: 0,
-    borderRadius: 16,
-    overflow: 'hidden',
-    boxShadow: '0 18px 50px rgba(0,0,0,0.4)',
-    transition: 'width 0.32s cubic-bezier(0.4, 0, 0.2, 1)',
-    ...GLASS,
-  };
+  const asideStyle = overlay
+    ? {
+        position: 'fixed',
+        zIndex: 60,
+        top: 10,
+        bottom: 10,
+        left: 10,
+        width: 'min(300px, calc(100vw - 80px))',
+        flexShrink: 0,
+        borderRadius: 16,
+        overflow: 'hidden',
+        boxShadow: '0 18px 50px rgba(0,0,0,0.55)',
+        transform: open ? 'translateX(0)' : 'translateX(calc(-100% - 20px))',
+        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        visibility: open ? 'visible' : 'hidden',
+        ...GLASS,
+      }
+    : {
+        position: 'relative',
+        zIndex: 10,
+        flexShrink: 0,
+        width: collapsed ? 60 : 272,
+        height: 'calc(100% - 20px)',
+        margin: 10,
+        marginRight: 0,
+        borderRadius: 16,
+        overflow: 'hidden',
+        boxShadow: '0 18px 50px rgba(0,0,0,0.4)',
+        transition: 'width 0.32s cubic-bezier(0.4, 0, 0.2, 1)',
+        ...GLASS,
+      };
+
+  // In overlay mode the expanded content is always visible (no icon rail).
+  const expandedVisible = overlay ? open : !collapsed;
 
   return (
     <aside style={asideStyle}>
@@ -710,8 +736,8 @@ function Sidebar({
           inset: 0,
           display: 'flex',
           flexDirection: 'column',
-          opacity: collapsed ? 0 : 1,
-          pointerEvents: collapsed ? 'none' : 'auto',
+          opacity: expandedVisible ? 1 : 0,
+          pointerEvents: expandedVisible ? 'auto' : 'none',
           transition: 'opacity 0.2s ease',
         }}
       >
@@ -742,8 +768,8 @@ function Sidebar({
           </span>
           <button
             type="button"
-            title="Collapse sidebar"
-            onClick={onToggleCollapse}
+            title={overlay ? 'Close sidebar' : 'Collapse sidebar'}
+            onClick={overlay ? onClose : onToggleCollapse}
             style={railBtn}
             onMouseEnter={(e) => railBtnHover(e, true)}
             onMouseLeave={(e) => railBtnHover(e, false)}
@@ -1056,6 +1082,7 @@ function Sidebar({
       </div>
 
       {/* ---------------------- collapsed icon rail ------------------------ */}
+      {!overlay && (
       <div
         style={{
           position: 'absolute',
@@ -1144,6 +1171,7 @@ function Sidebar({
           <LogOut size={16} />
         </button>
       </div>
+      )}
     </aside>
   );
 }
@@ -1152,6 +1180,11 @@ function Sidebar({
 
 export default function ChatPage({ onNavigate }) {
   const { user, token, logout } = useAuth();
+
+  // Below this width the history sidebar becomes an overlay drawer so the
+  // conversation keeps full width on phones.
+  const isMobile = useMedia('(max-width: 767px)');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const [chats, setChats] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -1399,8 +1432,14 @@ export default function ChatPage({ onNavigate }) {
         chats={chats}
         activeId={activeId}
         user={user}
-        onNewChat={handleNewChat}
-        onOpenChat={handleOpenChat}
+        onNewChat={(...args) => {
+          setMobileNavOpen(false);
+          return handleNewChat(...args);
+        }}
+        onOpenChat={(...args) => {
+          setMobileNavOpen(false);
+          return handleOpenChat(...args);
+        }}
         onRequestDelete={handleRequestDelete}
         onRenameChat={handleRenameChat}
         onLogout={logout}
@@ -1408,13 +1447,96 @@ export default function ChatPage({ onNavigate }) {
         onNavigateHome={() => onNavigate?.('/')}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+        overlay={isMobile}
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
       />
+
+      {/* Mobile drawer backdrop */}
+      {isMobile && mobileNavOpen && (
+        <div
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 55,
+            background: 'rgba(10, 12, 16, 0.6)',
+          }}
+        />
+      )}
 
       {/* Main area */}
       <main
         className="relative z-10 flex flex-col"
         style={{ flex: 1, minWidth: 0, height: '100%' }}
       >
+        {/* Mobile top bar: menu + brand + new chat (sidebar is a drawer here) */}
+        {isMobile && (
+          <div
+            className="flex items-center"
+            style={{
+              gap: 10,
+              padding: '12px 12px 8px',
+              flexShrink: 0,
+            }}
+          >
+            <button
+              type="button"
+              title="Open chat history"
+              aria-label="Open chat history"
+              onClick={() => setMobileNavOpen(true)}
+              className="flex items-center justify-center shrink-0"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 12,
+                border: `1px solid ${LINE_SOFT}`,
+                background: 'rgba(255,255,255,0.05)',
+                color: THEME.textMain,
+                cursor: 'pointer',
+              }}
+            >
+              <PanelLeftOpen size={17} />
+            </button>
+            <span
+              style={{
+                flex: 1,
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                fontFamily: MONO,
+                fontSize: '0.9rem',
+                fontWeight: 800,
+              }}
+            >
+              <span style={{ color: THEME.textMain }}>Distro</span>
+              <span style={{ color: THEME.accent }}>Pedia</span>
+              <span style={{ color: THEME.silver }}> AI</span>
+            </span>
+            <button
+              type="button"
+              title="New chat"
+              aria-label="New chat"
+              onClick={handleNewChat}
+              disabled={creating}
+              className="flex items-center justify-center shrink-0"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 12,
+                border: 'none',
+                color: '#fff',
+                background: `linear-gradient(135deg, ${THEME.accent} 0%, #b83d25 100%)`,
+                cursor: creating ? 'wait' : 'pointer',
+                opacity: creating ? 0.7 : 1,
+              }}
+            >
+              <Plus size={17} />
+            </button>
+          </div>
+        )}
         {isEmpty ? (
           /* Empty state: centered greeting + input */
           <div
@@ -1476,7 +1598,7 @@ export default function ChatPage({ onNavigate }) {
               style={{
                 flex: 1,
                 overflowY: 'auto',
-                padding: '20px 24px 8px',
+                padding: isMobile ? '12px 12px 8px' : '20px 24px 8px',
               }}
             >
               <div style={{ maxWidth: 780, margin: '0 auto' }}>
@@ -1530,7 +1652,7 @@ export default function ChatPage({ onNavigate }) {
             </div>
 
             {/* Input pinned at bottom */}
-            <div style={{ padding: '8px 24px 20px' }}>
+            <div style={{ padding: isMobile ? '8px 12px 16px' : '8px 24px 20px' }}>
               <div style={{ maxWidth: 780, margin: '0 auto' }}>
                 {error && (
                   <p

@@ -31,6 +31,7 @@ import CommentItem from '../components/community/CommentItem.jsx';
 import CommunityShell from '../components/community/CommunityShell.jsx';
 import { RailCard } from '../components/community/CommunityShell.jsx';
 import CommunityNav from '../components/community/CommunityNav.jsx';
+import { MobileChannelBar } from '../components/community/CommunityNav.jsx';
 import { AboutChannel } from '../components/community/CommunitySidebar.jsx';
 import { timeAgo } from '../utils/timeAgo.js';
 import {
@@ -762,6 +763,13 @@ export default function PostDetailPage({ postId, onNavigate }) {
 
   const isOwner = post && user && post.author?.id === user.id;
   const distro = post ? distroMap[post.channel] : null;
+  const channelItems = useMemo(
+    () => [
+      { key: 'general', label: 'General' },
+      ...distros.map((d) => ({ key: d.id, label: d.name, distro: d })),
+    ],
+    [distros]
+  );
   const hostname = (() => {
     if (!post?.linkUrl) return null;
     try {
@@ -801,6 +809,14 @@ export default function PostDetailPage({ postId, onNavigate }) {
             <AboutChannel channel={post.channel} distro={distro} stats={channelStats} />
           </>
         ) : null
+      }
+      mobileBar={
+        <MobileChannelBar
+          items={channelItems}
+          active={post?.channel}
+          onChannel={() => onNavigate?.('/community')}
+          onCreatePost={() => onNavigate?.('/community')}
+        />
       }
     >
       {/* Back */}
@@ -1115,12 +1131,12 @@ export default function PostDetailPage({ postId, onNavigate }) {
                     </button>
                   );
                 })}
-                <div style={{ flex: 1, minWidth: 40 }} />
+                <div style={{ flex: 1, minWidth: 4 }} />
                 <div
                   className="flex items-center"
                   style={{
-                    flex: 1,
-                    minWidth: 170,
+                    flex: '1 1 150px',
+                    minWidth: 140,
                     maxWidth: 280,
                     background: 'rgba(20, 24, 32, 0.55)',
                     border: `1px solid ${LINE}`,

@@ -204,3 +204,77 @@ export default function CommunityNav({ distros, channel, onNavigate, onChannel, 
     </aside>
   );
 }
+
+/**
+ * Mobile channel bar: horizontally scrollable channel chips + a compact
+ * create-post button. Rendered by CommunityShell when the left nav is hidden
+ * (< 1024px) so channels stay reachable on phones.
+ */
+export function MobileChannelBar({ items = [], active, onChannel, onCreatePost }) {
+  return (
+    <div
+      style={{
+        ...GLASS,
+        borderRadius: 16,
+        padding: '10px 10px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+      }}
+    >
+      <div
+        className="flex items-center"
+        style={{ gap: 6, overflowX: 'auto', paddingBottom: 2 }}
+      >
+        {items.map((item) => {
+          const isActive = active === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => onChannel?.(item.key)}
+              className="inline-flex items-center shrink-0 transition-colors"
+              style={{
+                gap: 6,
+                fontFamily: MONO,
+                fontSize: '0.7rem',
+                fontWeight: isActive ? 700 : 500,
+                color: isActive ? THEME.textMain : 'rgba(240,244,248,0.65)',
+                background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                border: `1px solid ${isActive ? 'rgba(255,255,255,0.3)' : LINE}`,
+                borderRadius: 9999,
+                padding: '6px 12px 6px 8px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <ChannelAvatar channel={item.key} distro={item.distro} size={18} />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={onCreatePost}
+        className="flex items-center justify-center transition-all"
+        style={{
+          gap: 6,
+          fontFamily: MONO,
+          fontSize: '0.74rem',
+          fontWeight: 700,
+          color: '#fff',
+          background: `linear-gradient(135deg, ${THEME.accent} 0%, #b83d25 100%)`,
+          border: '1px solid rgba(255,255,255,0.25)',
+          borderRadius: 9999,
+          padding: '8px 14px',
+          cursor: 'pointer',
+          width: '100%',
+        }}
+      >
+        <Plus size={14} />
+        Create post
+      </button>
+    </div>
+  );
+}

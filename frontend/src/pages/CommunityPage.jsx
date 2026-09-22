@@ -8,6 +8,7 @@ import PostCard from '../components/community/PostCard.jsx';
 import CommunityShell from '../components/community/CommunityShell.jsx';
 import { RailCard } from '../components/community/CommunityShell.jsx';
 import CommunityNav from '../components/community/CommunityNav.jsx';
+import { MobileChannelBar } from '../components/community/CommunityNav.jsx';
 import {
   RecentPosts,
 } from '../components/community/CommunitySidebar.jsx';
@@ -400,6 +401,15 @@ export default function CommunityPage({ onNavigate }) {
   const activeChannelLabel =
     channel === 'all' ? null : channel === 'general' ? 'General' : distroMap[channel]?.name;
 
+  const channelItems = useMemo(
+    () => [
+      { key: 'all', label: 'All' },
+      { key: 'general', label: 'General' },
+      ...distros.map((d) => ({ key: d.id, label: d.name, distro: d })),
+    ],
+    [distros]
+  );
+
   /* ---------------------------------- view ---------------------------------- */
 
   return (
@@ -417,6 +427,14 @@ export default function CommunityPage({ onNavigate }) {
         <>
           <RecentPosts onOpen={(p) => onNavigate?.(`/community/${p.id}`)} />
         </>
+      }
+      mobileBar={
+        <MobileChannelBar
+          items={channelItems}
+          active={channel}
+          onChannel={(k) => setChannel(k)}
+          onCreatePost={() => setComposerOpen(true)}
+        />
       }
     >
       {/* Channel context (only when a specific channel is active) */}
@@ -470,12 +488,12 @@ export default function CommunityPage({ onNavigate }) {
             </button>
           );
         })}
-        <div style={{ flex: 1, minWidth: 60 }} />
+        <div style={{ flex: 1, minWidth: 4 }} />
         <div
           className="flex items-center"
           style={{
-            flex: 1,
-            minWidth: 180,
+            flex: '1 1 150px',
+            minWidth: 140,
             maxWidth: 300,
             background: 'rgba(20, 24, 32, 0.55)',
             border: `1px solid ${LINE}`,

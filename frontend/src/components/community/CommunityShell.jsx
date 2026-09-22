@@ -1,25 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { THEME, LINE } from '../../theme/designTokens.js';
-
-function useMedia(query) {
-  const [matches, setMatches] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(query).matches
-  );
-  useEffect(() => {
-    const mql = window.matchMedia(query);
-    const onChange = (e) => setMatches(e.matches);
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
-  }, [query]);
-  return matches;
-}
+import useMedia from '../../hooks/useMedia.js';
 
 /**
  * Reddit-style three-column community frame:
  * [left nav 236px] [center flex] [right rail 300px] — rails hide on
  * narrower viewports. `nav` and `rail` are already-built node trees.
+ * `mobileBar` renders above the feed when the left nav is hidden, so
+ * channel switching + creating posts stay reachable on small screens.
  */
-export default function CommunityShell({ nav, rail, children }) {
+export default function CommunityShell({ nav, rail, mobileBar, children }) {
   const showNav = useMedia('(min-width: 1024px)');
   const showRail = useMedia('(min-width: 1280px)');
 
@@ -36,12 +26,17 @@ export default function CommunityShell({ nav, rail, children }) {
         style={{
           maxWidth: 1320,
           gap: 20,
-          padding: '16px 16px 64px',
+          padding: '12px 12px 64px',
           alignItems: 'flex-start',
         }}
       >
         {nav && showNav && nav}
-        <main style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>{children}</main>
+        <main style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+          {mobileBar && !showNav && (
+            <div style={{ marginBottom: 12 }}>{mobileBar}</div>
+          )}
+          {children}
+        </main>
         {rail && showRail && (
           <div
             style={{
