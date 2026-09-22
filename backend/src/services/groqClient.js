@@ -5,8 +5,11 @@ const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 export const NO_KEY_MESSAGE = 'GROQ_API_KEY is not configured. Add it to backend/.env';
 
-// Single chat-completion call → trimmed assistant text.
-// Throws (with the API's own error message) on non-OK responses.
+// Single chat-completion call → { text, usage }.
+// `usage` is the provider's token accounting ({ prompt_tokens,
+// completion_tokens, total_tokens }) or null when absent — callers pass it
+// through so the pipeline can log per-stage cost. Throws (with the API's
+// own error message) on non-OK responses.
 export async function chatCompletion(
   { system, messages = [], temperature = 0.7, maxTokens = 2048, jsonMode = false } = {},
   { timeoutMs = 20000 } = {}
@@ -45,7 +48,14 @@ export async function chatCompletion(
     throw new Error(message);
   }
   const data = await res.json();
-  return (data?.choices?.[0]?.message?.content || '').trim();
+  const usage = data?.usage
+    ? {
+        prompt_tokens: data.usage.prompt_tokens || 0,
+        completion_tokens: data.usage.completion_tokens || 0,
+        total_tokens: data.usage.total_tokens || 0,
+      }
+    : null;
+  return { text: (data?.choices?.[0]?.message?.content || '').trim(), usage };
 }
 
 // Stored chat history → Groq messages.

@@ -89,14 +89,26 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   // Research agents in parallel — each self-capped (Reddit ~8s, web ~20s)
   // and best-effort (reddit → [], web → { findings: '', sources: [] }).
-  const [redditResults, webResearch] = await Promise.all([
-    searchReddit(content),
-    runWebResearch({ question: content, history }),
+  // Stage timings + token usage are logged as one line per message so slow
+  // or expensive stages show up in plain server logs (data before tuning).
+  const started = Date.now();
+  const timed = async (label, fn) => {
+    const t0 = Date.now();
+    const out = await fn();
+    return { label, out, ms: Date.now() - t0 };
+  };
+  const [redditStage, webStage] = await Promise.all([
+    timed('reddit', () => searchReddit(content)),
+    timed('web', () => runWebResearch({ question: content, history })),
   ]);
+  const redditResults = redditStage.out;
+  const webResearch = webStage.out;
 
   // Final answer from the synthesizer (no search tool — synthesis only).
   let answer;
+  let synthMs = 0;
   try {
+    const t0 = Date.now();
     answer = await synthesizeAnswer({
       question: content,
       history,
@@ -104,6 +116,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
       webFindings: webResearch.findings,
       webSources: webResearch.sources,
     });
+    synthMs = Date.now() - t0;
   } catch (err) {
     res.status(502).json({
       success: false,
@@ -134,6 +147,14 @@ export const sendMessage = asyncHandler(async (req, res) => {
     chat.title = content.slice(0, 48);
   }
   await chat.save();
+
+  const tokens = (webResearch.usage?.total_tokens || 0) + (answer.usage?.total_tokens || 0);
+  console.log(
+    `[chat] chat=${chat._id} reddit=${redditStage.ms}ms(n=${redditResults.length}) ` +
+      `web=${webStage.ms}ms(tok=${webResearch.usage?.total_tokens || 0}) ` +
+      `synth=${synthMs}ms(tok=${answer.usage?.total_tokens || 0}) ` +
+      `total=${Date.now() - started}ms tokens=${tokens}`
+  );
 
   res.json({ success: true, data: { userMessage, assistantMessage } });
 });

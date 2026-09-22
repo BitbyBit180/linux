@@ -25,7 +25,7 @@ export async function synthesizeAnswer({
     webFindings || 'none',
   ].join('\n');
 
-  const content = await chatCompletion(
+  const { text: content, usage } = await chatCompletion(
     {
       system: SYSTEM_INSTRUCTION,
       messages: [...toMessages(history), { role: 'user', content: prompt }],
@@ -36,5 +36,5 @@ export async function synthesizeAnswer({
   );
 
   // Sources pass through from the research agent (Reddit thread links).
-  return { content, sources: webSources };
+  return { content, sources: webSources, usage };
 }

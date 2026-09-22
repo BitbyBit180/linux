@@ -10,7 +10,7 @@ const SYSTEM_INSTRUCTION = `You are the WEB RESEARCH sub-agent of DistroPedia As
 
 export async function runWebResearch({ question, history = [] } = {}) {
   try {
-    const findings = await chatCompletion(
+    const { text: findings, usage } = await chatCompletion(
       {
         system: SYSTEM_INSTRUCTION,
         messages: [...toMessages(history), { role: 'user', content: question }],
@@ -19,9 +19,9 @@ export async function runWebResearch({ question, history = [] } = {}) {
       },
       { timeoutMs: 20000 } // self-capped so the chat never hangs on research
     );
-    return { findings, sources: [] };
+    return { findings, sources: [], usage };
   } catch {
     // Research is best-effort — must never break the chat.
-    return { findings: '', sources: [] };
+    return { findings: '', sources: [], usage: null };
   }
 }
