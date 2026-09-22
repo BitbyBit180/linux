@@ -107,10 +107,10 @@ Atlas users: enable Continuous Backups in the cluster settings instead.
 ### Password reset delivery
 
 `POST /api/auth/forgot-password` issues a 15-minute token and hands it to
-`backend/src/utils/mailer.js`. No SMTP library is bundled: in development the
-token is printed to the server log (`RESET_DELIVERY=console`, the default);
-for production email, implement an SMTP/API sender behind `RESET_DELIVERY=smtp`
-in that file — the controller interface stays the same.
+`backend/src/utils/mailer.js`, which sends via SMTP (`SMTP_HOST/PORT/SECURE/USER/PASS/FROM`
+in `backend/.env` — Gmail works with an App Password). With no SMTP configured,
+development prints the token to the server log (`RESET_DELIVERY=console`); in
+production delivery refuses loudly instead of dropping the reset.
 
 ## API quick reference
 
