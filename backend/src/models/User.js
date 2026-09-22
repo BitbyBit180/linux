@@ -21,14 +21,19 @@ const userSchema = new mongoose.Schema(
     name: { type: String, default: '' },
     // Admins can moderate (edit/delete) any post or comment.
     isAdmin: { type: Boolean, default: false },
+    // Password-reset token (sha256 of the emailed token) + expiry.
+    resetTokenHash: { type: String, default: null },
+    resetTokenExpiry: { type: Date, default: null },
   },
   { timestamps: true }
 );
 
-// Shape API JSON: expose `id`, hide internal/password fields.
+// Shape API JSON: expose `id`, hide internal/password/reset fields.
 const shapeJSON = (doc, ret) => {
   ret.id = ret._id.toString();
   delete ret.passwordHash;
+  delete ret.resetTokenHash;
+  delete ret.resetTokenExpiry;
   delete ret._id;
   delete ret.__v;
   return ret;

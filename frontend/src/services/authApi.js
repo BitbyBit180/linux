@@ -99,3 +99,21 @@ export async function me() {
     return null;
   }
 }
+
+/** POST /api/auth/forgot-password { email } -> { message } (never throws for unknown emails) */
+export async function forgotPassword(email) {
+  const json = await request('/auth/forgot-password', {
+    method: 'POST',
+    body: { email },
+  });
+  return json;
+}
+
+/** POST /api/auth/reset-password { token, password } -> { message } */
+export async function resetPassword(token, password) {
+  const json = await request('/auth/reset-password', {
+    method: 'POST',
+    body: { token, password },
+  });
+  return json;
+}

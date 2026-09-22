@@ -87,6 +87,31 @@ If the API is down, `frontend/src/services/distroApi.js` falls back to local `fr
 
 In production set `VITE_API_URL=https://your-api-host/api` (in `frontend/.env`) and `CLIENT_URL` in `backend/.env`.
 
+### Backups (MongoDB)
+
+There is no automatic backup — schedule one wherever Mongo runs, or a dropped
+database means re-seeding from scratch (user accounts, chats, and community
+content are NOT in the seed):
+
+```bash
+# nightly dump (cron example, keeps 7 days)
+mongodump --uri="mongodb://127.0.0.1:27017/linux_hub" --out="/var/backups/linux_hub/$(date +%F)"
+find /var/backups/linux_hub -maxdepth 1 -mtime +7 -exec rm -rf {} +
+
+# restore
+mongorestore --uri="mongodb://127.0.0.1:27017/linux_hub" /var/backups/linux_hub/<date>/linux_hub
+```
+
+Atlas users: enable Continuous Backups in the cluster settings instead.
+
+### Password reset delivery
+
+`POST /api/auth/forgot-password` issues a 15-minute token and hands it to
+`backend/src/utils/mailer.js`. No SMTP library is bundled: in development the
+token is printed to the server log (`RESET_DELIVERY=console`, the default);
+for production email, implement an SMTP/API sender behind `RESET_DELIVERY=smtp`
+in that file — the controller interface stays the same.
+
 ## API quick reference
 
 | Method | Path | Notes |

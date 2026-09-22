@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bot, AlertCircle } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import { useAuth } from '../hooks/useAuth.js';
+import { forgotPassword as apiForgot, resetPassword as apiReset } from '../services/authApi.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
 
 const inputStyle = {
@@ -55,6 +56,112 @@ function AuthField({ label, type, value, onChange, autoFocus, autoComplete }) {
 }
 
 /**
+ * Forgot / reset sub-views: request a token by email, then redeem it with a
+ * new password. Reuses AuthField + the card's error/notice styling.
+ */
+function ForgotResetView({
+  view,
+  email,
+  setEmail,
+  resetToken,
+  setResetToken,
+  password,
+  setPassword,
+  busy,
+  error,
+  notice,
+  onForgot,
+  onReset,
+  onBack,
+}) {
+  const submitStyle = {
+    width: '100%',
+    fontFamily: MONO,
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    color: '#fff',
+    background: `linear-gradient(135deg, ${THEME.accent} 0%, #b83d25 100%)`,
+    border: '1px solid rgba(255,255,255,0.25)',
+    borderRadius: 9999,
+    padding: '10px 0',
+    cursor: busy ? 'wait' : 'pointer',
+    opacity: busy ? 0.75 : 1,
+  };
+  const backStyle = {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    fontFamily: MONO,
+    fontSize: '0.68rem',
+    color: THEME.accent,
+    cursor: 'pointer',
+  };
+  return (
+    <div>
+      {notice && (
+        <p
+          style={{
+            fontFamily: MONO,
+            fontSize: '0.74rem',
+            color: THEME.textMain,
+            background: 'rgba(255,255,255,0.05)',
+            border: `1px solid ${LINE}`,
+            borderRadius: 10,
+            padding: '9px 11px',
+            margin: '0 0 14px',
+            lineHeight: 1.6,
+          }}
+        >
+          {notice}
+        </p>
+      )}
+      {view === 'forgot' ? (
+        <form onSubmit={onForgot}>
+          <AuthField label="Email" type="email" value={email} onChange={setEmail} autoFocus autoComplete="email" />
+          {error && (
+            <p style={{ fontFamily: MONO, fontSize: '0.72rem', color: THEME.accent, margin: '0 0 12px' }}>
+              {error}
+            </p>
+          )}
+          <button type="submit" disabled={busy} style={submitStyle}>
+            {busy ? 'Sending…' : 'Send reset token'}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={onReset}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Reset token</label>
+            <input
+              type="text"
+              value={resetToken}
+              onChange={(e) => setResetToken(e.target.value)}
+              placeholder="Paste the token from the email / server log"
+              autoFocus
+              autoComplete="one-time-code"
+              style={inputStyle}
+            />
+          </div>
+          <AuthField label="New password" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
+          {error && (
+            <p style={{ fontFamily: MONO, fontSize: '0.72rem', color: THEME.accent, margin: '0 0 12px' }}>
+              {error}
+            </p>
+          )}
+          <button type="submit" disabled={busy} style={submitStyle}>
+            {busy ? 'Updating…' : 'Set new password'}
+          </button>
+        </form>
+      )}
+      <p style={{ fontFamily: MONO, fontSize: '0.68rem', color: THEME.textMuted, textAlign: 'center', margin: '14px 0 0' }}>
+        <button type="button" onClick={onBack} style={backStyle}>
+          ← Back to sign in
+        </button>
+      </p>
+    </div>
+  );
+}
+
+/**
  * Login / register card for DistroPedia AI. One component, two modes
  * (local `mode` state). On success calls onAuthSuccess() — App navigates
  * to /chat.
@@ -62,6 +169,9 @@ function AuthField({ label, type, value, onChange, autoFocus, autoComplete }) {
 export default function AuthPage({ onAuthSuccess, onNavigate }) {
   const { login, register } = useAuth();
   const [mode, setMode] = useState('login');
+  const [view, setView] = useState('auth'); // auth | forgot | reset
+  const [resetToken, setResetToken] = useState('');
+  const [notice, setNotice] = useState(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -71,6 +181,55 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
   const switchMode = (next) => {
     setMode(next);
     setError(null);
+  };
+
+  const openForgot = () => {
+    setView('forgot');
+    setError(null);
+    setNotice(null);
+  };
+
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    if (busy) return;
+    if (!email.trim()) {
+      setError('Enter your account email first.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const json = await apiForgot(email.trim());
+      setNotice(json.message);
+      setView('reset');
+    } catch (err) {
+      setError(err.message || 'Could not start the reset. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReset = async (e) => {
+    e.preventDefault();
+    if (busy) return;
+    if (!resetToken.trim() || password.length < 6) {
+      setError('Paste the token and choose a 6+ character password.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const json = await apiReset(resetToken.trim(), password);
+      setNotice(json.message);
+      setPassword('');
+      setResetToken('');
+      setView('auth');
+      setMode('login');
+    } catch (err) {
+      setError(err.message || 'Reset failed. The token may have expired.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -172,6 +331,9 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
             </p>
           </div>
 
+          {/* Mode toggle + sign-in/up form */}
+          {view === 'auth' ? (
+          <>
           {/* Mode toggle */}
           <div
             style={{
@@ -238,6 +400,31 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
               onChange={setPassword}
               autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
             />
+            {mode === 'login' && (
+              <div style={{ textAlign: 'right', margin: '-6px 0 12px' }}>
+                <button
+                  type="button"
+                  onClick={openForgot}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    fontFamily: MONO,
+                    fontSize: '0.68rem',
+                    color: THEME.textMuted,
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = THEME.accent;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = THEME.textMuted;
+                  }}
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
 
             {/* Inline error message */}
             {error && (
@@ -328,6 +515,29 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
               {mode === 'login' ? 'Create an account' : 'Sign in instead'}
             </button>
           </p>
+          </>
+          ) : (
+            /* Forgot / reset views */
+            <ForgotResetView
+              view={view}
+              email={email}
+              setEmail={setEmail}
+              resetToken={resetToken}
+              setResetToken={setResetToken}
+              password={password}
+              setPassword={setPassword}
+              busy={busy}
+              error={error}
+              notice={notice}
+              onForgot={handleForgot}
+              onReset={handleReset}
+              onBack={() => {
+                setView('auth');
+                setError(null);
+                setNotice(null);
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
