@@ -88,10 +88,29 @@ export default function QuizPage({ onNavigate }) {
     if (aiVerdict) {
       const order = [aiVerdict.winner, ...(aiVerdict.runnersUp || [])].filter(Boolean);
       const base = new Map(scoreQuiz(answers).map((r) => [r.distroId, r]));
+      // Match-% comes from Jev's probabilities (winner = 100, runners
+      // relative) so the numbers agree with the order shown. Falls back to
+      // points when probabilities are absent.
+      const probs = aiVerdict.probabilities || {};
+      const topP = Math.max(0, ...order.map((id) => Number(probs[id]) || 0));
       return order.map((id, i) => {
         const hit = base.get(id);
-        if (hit) return hit;
-        return { distroId: id, points: 0, percent: i === 0 ? 100 : Math.max(40, 85 - i * 10), reasons: [] };
+        const entry = hit || {
+          distroId: id,
+          points: 0,
+          reasons: [],
+        };
+        const percent =
+          topP > 0 && probs[id] != null
+            ? i === 0
+              ? 100
+              : Math.max(5, Math.round(((Number(probs[id]) || 0) / topP) * 100))
+            : hit
+              ? hit.percent
+              : i === 0
+                ? 100
+                : Math.max(40, 85 - i * 10);
+        return { ...entry, percent };
       });
     }
     return ranked;

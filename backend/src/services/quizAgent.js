@@ -99,6 +99,9 @@ export async function recommendDistro({ answers = [], shortlist = [], catalogue 
   const topProb = Number(probabilities[verdict.choice] ?? probabilities[winner] ?? 0);
 
   // Rank every option by probability: winner first, then the next two.
+  // Runners must come from the rule-based shortlist — the distribution tail
+  // is noise, and a runner the points system never surfaced erodes trust.
+  const shortlistIds = shortlist.map((s) => String(s.distroId).toLowerCase());
   const ranked = Object.entries(probabilities)
     .map(([id, p]) => ({ id: String(id).toLowerCase(), p: Number(p) || 0 }))
     .filter((r) => byId.has(r.id))
@@ -110,9 +113,14 @@ export async function recommendDistro({ answers = [], shortlist = [], catalogue 
     ranked.unshift({ id: winner, p: topProb });
   }
   const runnersUp = ranked
-    .filter((r) => r.id !== winner)
+    .filter((r) => r.id !== winner && shortlistIds.includes(r.id))
     .slice(0, 2)
     .map((r) => r.id);
+  // Fill any remaining runner slot from the shortlist order (points desc).
+  for (const id of shortlistIds) {
+    if (runnersUp.length >= 2) break;
+    if (id !== winner && !runnersUp.includes(id) && byId.has(id)) runnersUp.push(id);
+  }
 
   const winnerReasons =
     shortlist.find((s) => String(s.distroId).toLowerCase() === winner)?.reasons || [];
