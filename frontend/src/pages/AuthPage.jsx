@@ -81,12 +81,15 @@ function OtpInput({ value, onChange, onComplete, disabled }) {
   };
 
   const handleKeyDown = (i, e) => {
-    if (e.key === 'Backspace' && !digits[i].trim()) {
-      e.preventDefault();
-      if (i > 0) {
-        setDigit(i - 1, ' ');
-        boxes.current[i - 1]?.focus();
-      }
+    if (e.key !== 'Backspace') return;
+    // Manage deletion manually: onChange ignores empty values, so letting
+    // the browser clear the box would make React restore the digit.
+    e.preventDefault();
+    if (digits[i].trim()) {
+      setDigit(i, ' '); // filled box -> clear it, stay put
+    } else if (i > 0) {
+      setDigit(i - 1, ' '); // empty box -> clear previous, move back
+      boxes.current[i - 1]?.focus();
     }
   };
 
