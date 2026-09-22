@@ -21,7 +21,6 @@ import {
   Pencil,
   TriangleAlert,
   Download,
-  Table2,
 } from 'lucide-react';
 import AuthPage from './AuthPage.jsx';
 import { useAuth } from '../hooks/useAuth.js';
@@ -161,14 +160,17 @@ const tableToMarkdown = (tableEl) => {
   return lines.join('\n');
 };
 
-// Rendered <table> wrapper with a "Copy table" overlay button
+// Rendered <table> with a copy icon sitting BESIDE it (in normal flow, so
+// it never overlaps the table content). Copies clean GitHub-flavored
+// markdown reconstructed from the DOM.
 function TableBlock({ children }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef(null);
+  const tableRef = useRef(null);
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  const handleCopy = (e) => {
-    const table = e.currentTarget.parentElement.querySelector('table');
+  const handleCopy = () => {
+    const table = tableRef.current;
     if (!table) return;
     navigator.clipboard.writeText(tableToMarkdown(table)).catch(() => {});
     setCopied(true);
@@ -177,31 +179,35 @@ function TableBlock({ children }) {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="flex items-start" style={{ gap: 6 }}>
+      <div ref={tableRef} style={{ flex: 1, minWidth: 0, overflowX: 'auto' }}>
+        <table>{children}</table>
+      </div>
       <button
         type="button"
         onClick={handleCopy}
-        className="flex items-center gap-1.5"
+        title={copied ? 'Copied' : 'Copy table as markdown'}
+        aria-label={copied ? 'Copied' : 'Copy table as markdown'}
+        className="flex items-center justify-center shrink-0 transition-colors"
         style={{
-          position: 'absolute',
-          top: 6,
-          right: 6,
-          zIndex: 2,
-          fontFamily: MONO,
-          fontSize: '0.64rem',
+          width: 28,
+          height: 28,
+          borderRadius: 8,
           color: copied ? THEME.accent : THEME.textMuted,
-          background: 'rgba(20, 24, 32, 0.75)',
+          background: 'rgba(255,255,255,0.04)',
           border: `1px solid ${copied ? `${THEME.accent}66` : LINE}`,
-          borderRadius: 6,
-          padding: '3px 8px',
           cursor: 'pointer',
-          backdropFilter: 'blur(6px)',
+          padding: 0,
+        }}
+        onMouseEnter={(e) => {
+          if (!copied) e.currentTarget.style.color = THEME.textMain;
+        }}
+        onMouseLeave={(e) => {
+          if (!copied) e.currentTarget.style.color = THEME.textMuted;
         }}
       >
-        {copied ? <Check size={11} /> : <Table2 size={11} />}
-        {copied ? 'Copied' : 'Copy table'}
+        {copied ? <Check size={13} /> : <Copy size={13} />}
       </button>
-      <table>{children}</table>
     </div>
   );
 }
