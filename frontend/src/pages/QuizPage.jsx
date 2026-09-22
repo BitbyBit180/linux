@@ -16,9 +16,10 @@ import { getAiRecommendation } from '../services/quizApi.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
 
 /**
- * "Find Your Distro" — a short wizard with AI-personalized results.
- * Rule-based scoring gives an instant top-3; Groq then re-ranks and
- * explains the pick. If the AI is unreachable, the classic match stands.
+ * "Find Your Distro" — a short wizard with a single Jev-decided result.
+ * The quiz waits for Jev's verdict before ranking anything, so the user
+ * sees one decision instead of a rule-based flash followed by a re-rank.
+ * If Jev is unreachable, the classic rule-based match stands.
  */
 export default function QuizPage({ onNavigate }) {
   const { distros } = useDistros();
@@ -37,16 +38,18 @@ export default function QuizPage({ onNavigate }) {
     [done, answers]
   );
 
-  // AI verdict: re-ranks + explains once the quiz is complete.
-  // 'idle' | 'loading' | 'ready' | 'fallback' (fallback = classic match).
+  // AI verdict (Jev): the quiz WAITS for this before ranking anything, so
+  // the user sees exactly one decision — no rule-based flash, no re-rank flip.
+  // 'idle' | 'deciding' | 'ready' | 'fallback' (fallback = classic match).
   const [aiState, setAiState] = useState({ status: 'idle', verdict: null });
 
   useEffect(() => {
     if (!done) return;
     let cancelled = false;
-    setAiState({ status: 'loading', verdict: null });
+    setAiState({ status: 'deciding', verdict: null });
 
     const readable = QUIZ_QUESTIONS.map((q) => ({
+      questionId: q.id,
       question: q.question,
       answer: q.options[answers[q.id]]?.label || 'Skipped',
     }));
@@ -60,7 +63,7 @@ export default function QuizPage({ onNavigate }) {
         if (json?.ai && json?.winner) {
           setAiState({ status: 'ready', verdict: json });
         } else {
-          setAiState({ status: 'fallback', verdict: null });
+          setAiState({ status: 'fallback', verdict: json || null });
         }
       })
       .catch(() => {
@@ -72,14 +75,16 @@ export default function QuizPage({ onNavigate }) {
     };
   }, [done]);
 
-  // Display order: AI verdict when ready (guarded against unknown ids),
-  // otherwise the instant rule-based ranking.
+  // Display order is set ONCE the verdict lands: Jev's winner + runners-up
+  // enriched with local points/percent/reasons, or the rule-based ranking
+  // when AI is unavailable. Nothing renders before that.
   const aiVerdict =
     aiState.status === 'ready' && aiState.verdict && distroMap[aiState.verdict.winner]
       ? aiState.verdict
       : null;
+  const decided = aiState.status === 'ready' || aiState.status === 'fallback';
   const displayRanked = useMemo(() => {
-    if (!done) return [];
+    if (!done || !decided) return [];
     if (aiVerdict) {
       const order = [aiVerdict.winner, ...(aiVerdict.runnersUp || [])].filter(Boolean);
       const base = new Map(scoreQuiz(answers).map((r) => [r.distroId, r]));
@@ -90,7 +95,7 @@ export default function QuizPage({ onNavigate }) {
       });
     }
     return ranked;
-  }, [done, aiVerdict, answers, ranked]);
+  }, [done, decided, aiVerdict, answers, ranked]);
   const topDistro = displayRanked[0] ? distroMap[displayRanked[0].distroId] : null;
 
   const choose = (optIndex) => {
@@ -163,16 +168,72 @@ export default function QuizPage({ onNavigate }) {
             }}
           >
             {done
-              ? aiState.status === 'loading'
-                ? 'AI is analyzing your answers for a personal pick…'
+              ? !decided
+                ? 'Jev is weighing your answers to pick your best match…'
                 : aiVerdict
-                  ? 'AI-personalized recommendation, just for you.'
+                  ? `Jev picked your match${typeof aiVerdict.confidence === 'number' ? ` · ${Math.round(aiVerdict.confidence * 100)}% confidence` : ''}.`
                   : 'Based on your answers, here are your best matches.'
               : `Answer ${total} quick questions and we'll match you with the right Linux distro.`}
           </p>
         </div>
 
-        {done ? (
+        {!done ? (
+          /* ------------------------------ wizard ------------------------------ (see below) */
+          null
+        ) : !decided ? (
+          /* ------------------------- deciding loader ------------------------- */
+          /* One decision, rendered once: the ranking appears only after Jev
+             answers, so there is no rule-based flash followed by a re-rank. */
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              borderRadius: 20,
+              padding: '40px 24px',
+              textAlign: 'center',
+              border: `1px solid ${LINE}`,
+              background: 'rgba(28, 34, 41, 0.55)',
+            }}
+          >
+            <div
+              className="flex items-center justify-center mx-auto animate-pulse"
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 9999,
+                background: 'rgba(224, 90, 56, 0.15)',
+                border: '1px solid rgba(224, 90, 56, 0.4)',
+                marginBottom: 16,
+              }}
+            >
+              <Sparkles size={24} color={THEME.accent} />
+            </div>
+            <p
+              style={{
+                fontFamily: MONO,
+                fontSize: '0.88rem',
+                fontWeight: 700,
+                color: THEME.textMain,
+                margin: '0 0 6px',
+              }}
+            >
+              Finding your distro…
+            </p>
+            <p
+              style={{
+                fontFamily: MONO,
+                fontSize: '0.72rem',
+                color: THEME.textMuted,
+                margin: 0,
+                lineHeight: 1.7,
+              }}
+            >
+              Comparing all 14 distros against your answers.
+              <br />
+              Your ranked result appears here in a moment.
+            </p>
+          </motion.div>
+        ) : (
           /* ------------------------------ results ------------------------------ */
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             {/* AI explanation */}
@@ -227,22 +288,6 @@ export default function QuizPage({ onNavigate }) {
                     {aiVerdict.tip}
                   </p>
                 ) : null}
-              </div>
-            ) : aiState.status === 'loading' ? (
-              <div
-                className="animate-pulse"
-                style={{
-                  borderRadius: 16,
-                  padding: '16px 18px',
-                  marginBottom: 16,
-                  border: `1px solid ${LINE}`,
-                  background: 'rgba(255,255,255,0.03)',
-                  fontFamily: MONO,
-                  fontSize: '0.72rem',
-                  color: THEME.textMuted,
-                }}
-              >
-                Consulting AI for a personalized explanation…
               </div>
             ) : null}
 
@@ -573,11 +618,12 @@ export default function QuizPage({ onNavigate }) {
                   margin: '14px 0 0',
                 }}
               >
-                Showing the classic match — AI explanation unavailable right now.
+                Showing the classic match — Jev is unreachable right now.
               </p>
             ) : null}
           </motion.div>
-        ) : (
+        )}
+        {!done && (
           /* ------------------------------ wizard ------------------------------ */
           <>
             {/* Progress */}

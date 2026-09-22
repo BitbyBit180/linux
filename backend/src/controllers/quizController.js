@@ -1,8 +1,8 @@
 import Distro from '../models/Distro.js';
 import { DISTROS as STATIC_DISTROS } from '../data/distros.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { recommendDistro } from '../services/quizAgent.js';
-import { NO_KEY_MESSAGE } from '../services/groqClient.js';
+import { recommendDistro, MIN_TOP_PROBABILITY } from '../services/quizAgent.js';
+import { NO_KEY_MESSAGE } from '../services/jevClient.js';
 
 const CATALOGUE_FIELDS = 'distroId name tagline category desktop releaseModel minRam';
 
@@ -51,7 +51,8 @@ function sanitizeOrder(ids = [], allowed) {
 
 // POST /api/quiz/recommend  { answers: [{question, answer}], shortlist: [{distroId, points?, reasons?[]}] }
 // Public (no auth) — the quiz is for every visitor. Always responds 200:
-// { success, ai: true|false, winner, runnersUp, explanation, strengths, tip, message? }
+// { success, ai: true|false, winner, runnersUp, probabilities, confidence,
+//   explanation, strengths, tip, message? }
 // ai:false means "AI unavailable, use the rule-based shortlist order" —
 // the frontend falls back to its local scoring so the UI never breaks.
 export const recommendQuizDistro = asyncHandler(async (req, res) => {
@@ -83,7 +84,7 @@ export const recommendQuizDistro = asyncHandler(async (req, res) => {
     });
 
   // Graceful degradation before spending a model call.
-  if (!process.env.GROQ_API_KEY || !process.env.GROQ_API_KEY.trim()) {
+  if (!process.env.TYPESAFE_API_KEY || !process.env.TYPESAFE_API_KEY.trim()) {
     return fallback(NO_KEY_MESSAGE);
   }
 
@@ -102,13 +103,23 @@ export const recommendQuizDistro = asyncHandler(async (req, res) => {
     if (runnersUp.length >= 2) break;
     if (id !== winner && !runnersUp.includes(id)) runnersUp.push(id);
   }
-  if (!winner) return fallback('AI returned an unknown distro. Showing the classic match.');
+  // A near-uniform distribution means Jev couldn't separate the options —
+  // trust the rule-based points instead of a coin flip.
+  if (!winner || (verdict?.topProbability ?? 1) < MIN_TOP_PROBABILITY) {
+    return fallback(
+      !winner
+        ? 'AI returned an unknown distro. Showing the classic match.'
+        : 'AI was unsure — showing the classic match.'
+    );
+  }
 
   res.json({
     success: true,
     ai: true,
     winner,
     runnersUp: runnersUp.slice(0, 2),
+    probabilities: verdict?.probabilities || {},
+    confidence: verdict?.confidence ?? null,
     explanation: typeof verdict?.explanation === 'string' ? verdict.explanation.slice(0, 800) : '',
     strengths:
       verdict?.strengths && typeof verdict.strengths === 'object' ? verdict.strengths : {},

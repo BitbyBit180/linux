@@ -1,72 +1,138 @@
-// QUIZ agent — turns "Find Your Distro" quiz answers into a personalized
-// recommendation with a human-readable explanation. Single Groq call,
-// synthesis only (keeps it fast and cheap).
+// QUIZ agent — turns "Find Your Distro" quiz answers into a single ranked
+// verdict. Jev (TypeSafe System One) makes ONE Choice judgment — the winner —
+// and code derives everything else from its probability distribution:
+//
+// - runners-up = 2nd/3rd most probable options (no second model call)
+// - explanation/strengths/tip = composed in code from the user's own answers
+//   and the rule-based reasons (Jev returns typed judgments, not prose)
 //
 // Contract: the controller passes the user's readable Q&A, the rule-based
-// shortlist (hint), and the distro catalogue. We return the parsed JSON:
-// { winner, runnersUp[2], explanation, strengths{}, tip }.
+// shortlist (hint) with reasons, and the distro catalogue. We return:
+// { winner, runnersUp[2], probabilities, confidence, explanation, strengths, tip }.
 
-import { chatCompletion } from './groqClient.js';
+import { systemOne } from './jevClient.js';
 
-const SYSTEM_INSTRUCTION = `You are DistroPedia's distro-matching expert. A user answered a "Find Your Distro" quiz. Recommend exactly ONE winner and TWO runners-up chosen ONLY from the allowed catalogue ids.
+// Below this top-probability the pick is barely above uniform noise across
+// the 14 options — let the controller fall back to the rule-based order.
+export const MIN_TOP_PROBABILITY = 0.15;
 
-Weigh the whole person, not just keywords: a beginner who wants gaming and proprietary drivers should get Pop!_OS or Mint, not Arch — even if they said "latest updates". A security professional gets Kali. A tinkerer who lives in the terminal gets Arch, Gentoo, NixOS or Void. Someone reviving old hardware gets Alpine or Void. Prefer the rule-based shortlist when it fits, but overrule it when the user's answers clearly point elsewhere (that is your value over the point system).
+// One concrete, factual first step per distro (shown as "First step: …").
+const FIRST_STEP_TIPS = {
+  ubuntu: 'Flash the Ubuntu ISO with Balena Etcher, boot it, and follow the guided installer.',
+  mint: 'Boot the Mint ISO and tick “install multimedia codecs” during setup.',
+  zorin: 'Boot the Zorin ISO and pick your desktop layout on first boot.',
+  popos: 'Flash the Pop!_OS ISO (NVIDIA build for NVIDIA GPUs) and encrypt the disk at install.',
+  manjaro: 'Boot the Manjaro ISO with non-free drivers selected for NVIDIA hardware.',
+  fedora: 'Write the Fedora Workstation ISO with Fedora Media Writer, then enable RPM Fusion.',
+  arch: 'Boot the Arch ISO, connect with iwctl on Wi-Fi, then run the archinstall script.',
+  opensuse: 'Boot the openSUSE Tumbleweed ISO and keep snapper snapshots enabled during partitioning.',
+  debian: 'Boot the Debian netinst ISO with non-free firmware included for Wi-Fi support.',
+  gentoo: 'Boot the Gentoo minimal ISO, follow the handbook, and set aside a full afternoon.',
+  nixos: 'Boot the NixOS graphical ISO and declare your system in /etc/nixos/configuration.nix.',
+  void: 'Boot the Void ISO (glibc flavour for Steam and proprietary apps) and run void-installer.',
+  alpine: 'Boot the Alpine ISO, log in as root, and run the setup-alpine script.',
+  kali: 'Flash the Kali installer ISO and choose guided encrypted LVM partitioning.',
+};
 
-Return STRICT JSON only — no markdown fences, no prose outside the JSON:
-{
-  "winner": "<catalogue id>",
-  "runnersUp": ["<catalogue id>", "<catalogue id>"],
-  "explanation": "2-3 warm, personal sentences explaining WHY the winner fits THIS user. Reference their actual answers (experience, use-case, hardware, attitude to effort). No generic marketing fluff.",
-  "strengths": { "<winner id>": "one line: its killer trait for this user", "<runner id>": "one line each" },
-  "tip": "one concrete first step after installing the winner (under 20 words)"
-}`;
+function answerFor(answers, questionId) {
+  return answers.find((a) => a.questionId === questionId)?.answer || null;
+}
 
-function parseRecommendation(text) {
-  const clean = String(text || '')
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/```\s*$/i, '')
-    .trim();
-  const start = clean.indexOf('{');
-  const end = clean.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error('AI returned an unreadable recommendation. Please try again.');
-  }
-  return JSON.parse(clean.slice(start, end + 1));
+// 2–3 grounded sentences: who the user is (their own words) + why the winner
+// fits (its rule-based reasons). No invented facts — everything comes from
+// the quiz answers and the scoring table.
+function buildExplanation({ winnerName, answers, winnerReasons }) {
+  const experience = answerFor(answers, 'experience');
+  const use = answerFor(answers, 'use');
+  const effort = answerFor(answers, 'effort');
+  const profile = [experience, use, effort].filter(Boolean).join(' · ');
+  const reasons = (winnerReasons || []).slice(0, 3).join('; ');
+  const head = profile
+    ? `Based on your answers (${profile}), ${winnerName} is your best match.`
+    : `${winnerName} is your best match.`;
+  const tail = reasons
+    ? `It fits because it is ${reasons.charAt(0).toLowerCase()}${reasons.slice(1)}.`
+    : '';
+  return `${head}${tail ? ` ${tail}` : ''}`.slice(0, 800);
 }
 
 export async function recommendDistro({ answers = [], shortlist = [], catalogue = [] } = {}) {
-  const qaLines = answers.map((a) => `- ${a.question} → ${a.answer}`).join('\n');
-  const shortLines = shortlist
-    .map((s) => `- ${s.distroId}${s.points !== undefined ? ` (${s.points} pts)` : ''}${s.reasons?.length ? `: ${s.reasons.join('; ')}` : ''}`)
-    .join('\n');
-  const catLines = catalogue
-    .map(
-      (d) =>
-        `- ${d.id} (${d.name}): ${d.tagline || ''} | category: ${d.category || ''} | desktop: ${d.desktop || ''} | release: ${d.releaseModel || ''} | min RAM: ${d.minRam || ''}`
-    )
-    .join('\n');
+  const byId = new Map(catalogue.map((d) => [String(d.id).toLowerCase(), d]));
 
-  const prompt = [
-    'USER QUIZ ANSWERS:',
-    qaLines || 'none',
-    '',
-    'RULE-BASED SHORTLIST (hint — you may overrule it with justification in the explanation):',
-    shortLines || 'none',
-    '',
-    'ALLOWED CATALOGUE (winner + runnersUp must come from these ids):',
-    catLines,
-  ].join('\n');
+  // The Choice options ARE the catalogue: id → one-line rubric for Jev.
+  const criteria = {};
+  for (const d of catalogue) {
+    criteria[d.id] =
+      `${d.name} — ${d.tagline || ''} | category: ${d.category || ''} | ` +
+      `desktop: ${d.desktop || ''} | release: ${d.releaseModel || ''} | min RAM: ${d.minRam || ''}`;
+  }
 
-  const text = await chatCompletion(
-    {
-      system: SYSTEM_INSTRUCTION,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      maxTokens: 1024,
-      jsonMode: true,
+  const data = await systemOne({
+    state: {
+      answers: answers.map((a) => ({ question: a.question, answer: a.answer })),
+      shortlist_hint: shortlist.map((s) => ({
+        distroId: s.distroId,
+        points: s.points,
+        reasons: s.reasons || [],
+      })),
     },
-    { timeoutMs: 25000 }
-  );
+    questions: {
+      best_distro: {
+        type: 'choice',
+        instructions: {
+          question: 'Which catalogue distro is the single best match for the user described in `answers`?',
+          rubric:
+            'Weigh the whole person, not just keywords: a beginner who wants gaming and proprietary drivers should get Pop!_OS or Mint, never Arch — even if they said “latest updates”. A security professional gets Kali. A tinkerer who lives in the terminal gets Arch, Gentoo, NixOS or Void. Someone reviving old hardware gets Alpine or Void. Prefer the rule-based shortlist in `shortlist_hint` when it fits, but overrule it when the answers clearly point elsewhere.',
+        },
+        criteria,
+      },
+    },
+  });
 
-  return parseRecommendation(text);
+  const verdict = data?.answers?.best_distro;
+  if (!verdict || verdict.type !== 'choice' || !verdict.choice) {
+    throw new Error('AI returned an unreadable recommendation. Please try again.');
+  }
+
+  const winner = String(verdict.choice).toLowerCase();
+  const probabilities = verdict.probabilities || {};
+  const topProb = Number(probabilities[verdict.choice] ?? probabilities[winner] ?? 0);
+
+  // Rank every option by probability: winner first, then the next two.
+  const ranked = Object.entries(probabilities)
+    .map(([id, p]) => ({ id: String(id).toLowerCase(), p: Number(p) || 0 }))
+    .filter((r) => byId.has(r.id))
+    .sort((a, b) => b.p - a.p);
+  if (!byId.has(winner)) {
+    throw new Error('AI returned an unknown distro. Showing the classic match.');
+  }
+  if (!ranked.some((r) => r.id === winner)) {
+    ranked.unshift({ id: winner, p: topProb });
+  }
+  const runnersUp = ranked
+    .filter((r) => r.id !== winner)
+    .slice(0, 2)
+    .map((r) => r.id);
+
+  const winnerReasons =
+    shortlist.find((s) => String(s.distroId).toLowerCase() === winner)?.reasons || [];
+  const winnerName = byId.get(winner).name;
+  const strengths = { [winner]: winnerReasons[0] || byId.get(winner).tagline || '' };
+  for (const id of runnersUp) {
+    const r =
+      shortlist.find((s) => String(s.distroId).toLowerCase() === id)?.reasons || [];
+    strengths[id] = r[0] || byId.get(id)?.tagline || '';
+  }
+
+  return {
+    winner,
+    runnersUp,
+    probabilities,
+    confidence: typeof verdict.confidence === 'number' ? verdict.confidence : null,
+    topProbability: topProb,
+    explanation: buildExplanation({ winnerName, answers, winnerReasons }),
+    strengths,
+    tip: FIRST_STEP_TIPS[winner] || null,
+    model: data?.model || null,
+  };
 }

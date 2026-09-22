@@ -15,7 +15,7 @@ No tests, linter, typecheck, or CI exist. Verify with `vite build` (frontend) an
 ## Gotchas
 
 - **Port 5000 busy (`EADDRINUSE`)**: `node --watch` keeps old servers alive. `fuser -k 5000/tcp` or kill the stale `node server.js` before restarting.
-- **Backend needs MongoDB + `.env`**: copy `backend/.env.example` → `backend/.env`. `MONGO_URI` defaults to local; `GROQ_API_KEY` enables chat/quiz AI (both degrade gracefully without it — quiz returns `ai:false`, chat returns 503).
+- **Backend needs MongoDB + `.env`**: copy `backend/.env.example` → `backend/.env`. `MONGO_URI` defaults to local; `GROQ_API_KEY` enables AI chat and `TYPESAFE_API_KEY` (Jev) enables the quiz verdict (both degrade gracefully without it — quiz returns `ai:false`, chat returns 503).
 - **Field-name mapping**: frontend `id` / `init` / `installGuide` ↔ DB `distroId` / `initSystem` (`init` is a reserved Mongoose method) / `installation`. Controllers already translate both directions — keep using their helpers.
 
 ## Architecture
