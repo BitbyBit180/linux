@@ -28,3 +28,12 @@ export const protect = asyncHandler(async (req, res, next) => {
   req.user = user;
   next();
 });
+
+// "requireAdmin" — must run after `protect`; rejects non-admins with 403.
+export const requireAdmin = (req, res, next) => {
+  if (!req.user?.isAdmin) {
+    res.status(403);
+    throw new Error('Admin access required');
+  }
+  next();
+};

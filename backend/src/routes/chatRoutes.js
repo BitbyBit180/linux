@@ -8,6 +8,7 @@ import {
   sendMessage,
 } from '../controllers/chatController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { chatMessageLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -17,6 +18,6 @@ router.use(protect);
 router.route('/').get(getChats).post(createChat);
 router.route('/:id').get(getChat).delete(deleteChat);
 router.put('/:id/rename', renameChat);
-router.post('/:id/messages', sendMessage);
+router.post('/:id/messages', chatMessageLimiter, sendMessage);
 
 export default router;

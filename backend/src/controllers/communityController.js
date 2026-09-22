@@ -2,7 +2,9 @@ import Post from '../models/Post.js';
 import Comment from '../models/Comment.js';
 import Vote, { applyVote } from '../models/Vote.js';
 import Flavour from '../models/Flavour.js';
+import AuditLog from '../models/AuditLog.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { logAdminAction, isAdminOnOthersContent } from '../utils/auditLog.js';
 
 // Community (Reddit-style) posts + comments, scoped to per-distro channels.
 // Every route is behind `protect` (see communityRoutes) — req.user is set.
@@ -222,6 +224,15 @@ export const updatePost = asyncHandler(async (req, res) => {
   if (linkUrl !== undefined) post.linkUrl = linkUrl;
 
   await post.save();
+  if (isAdminOnOthersContent(req.user, post.author._id)) {
+    logAdminAction({
+      actorId: req.user._id,
+      action: 'post.update',
+      targetType: 'post',
+      targetId: post._id,
+      detail: String(post.title || '').slice(0, 140),
+    });
+  }
   res.json({
     success: true,
     data: { ...post.toJSON(), userVote: await getUserVote(req.user._id, 'post', post._id) },
@@ -256,6 +267,15 @@ export const deletePost = asyncHandler(async (req, res) => {
       { targetType: 'comment', targetId: { $in: commentIds } },
     ],
   });
+  if (isAdminOnOthersContent(req.user, post.author)) {
+    logAdminAction({
+      actorId: req.user._id,
+      action: 'post.delete',
+      targetType: 'post',
+      targetId: post._id,
+      detail: String(post.title || '').slice(0, 140),
+    });
+  }
   await post.deleteOne();
 
   res.json({ success: true, message: 'Post deleted' });
@@ -332,6 +352,15 @@ export const updateComment = asyncHandler(async (req, res) => {
   }
   comment.body = body;
   await comment.save();
+  if (isAdminOnOthersContent(req.user, comment.author._id)) {
+    logAdminAction({
+      actorId: req.user._id,
+      action: 'comment.update',
+      targetType: 'comment',
+      targetId: comment._id,
+      detail: String(body || '').slice(0, 140),
+    });
+  }
   res.json({
     success: true,
     data: {
@@ -369,6 +398,15 @@ export const deleteComment = asyncHandler(async (req, res) => {
   await Comment.deleteMany({ _id: { $in: ids } });
   await Vote.deleteMany({ targetType: 'comment', targetId: { $in: ids } });
   await Post.findByIdAndUpdate(comment.post, { $inc: { commentCount: -ids.length } });
+  if (isAdminOnOthersContent(req.user, comment.author)) {
+    logAdminAction({
+      actorId: req.user._id,
+      action: 'comment.delete',
+      targetType: 'comment',
+      targetId: comment._id,
+      detail: String(comment.body || '').slice(0, 140),
+    });
+  }
 
   res.json({
     success: true,
@@ -376,6 +414,33 @@ export const deleteComment = asyncHandler(async (req, res) => {
   });
 });
 
+// GET /api/community/admin/audit?page=&limit= — append-only admin action
+// log, newest first. Admin only (see requireAdmin on the route).
+export const getAuditLog = asyncHandler(async (req, res) => {
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+  const total = await AuditLog.countDocuments({});
+  const logs = await AuditLog.find({})
+    .populate('actor', 'name')
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .lean();
+  res.json({
+    success: true,
+    data: {
+      logs: logs.map((l) => ({
+        ...l,
+        id: l._id.toString(),
+        _id: undefined,
+        __v: undefined,
+      })),
+      page,
+      totalPages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+    },
+  });
+});
 // POST /api/community/comments/:id/vote { value }
 export const voteComment = asyncHandler(async (req, res) => {
   const value = Number(req.body?.value);
