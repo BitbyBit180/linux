@@ -7,6 +7,8 @@ import Report from '../models/Report.js';
 import Notification from '../models/Notification.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { logAdminAction, isAdminOnOthersContent } from '../utils/auditLog.js';
+import { suggestChannel } from '../services/channelSuggestAgent.js';
+import { screenContent } from '../services/moderationAgent.js';
 
 // Community (Reddit-style) posts + comments, scoped to per-distro channels.
 // Every route is behind `protect` (see communityRoutes) — req.user is set.
@@ -167,6 +169,8 @@ export const createPost = asyncHandler(async (req, res) => {
     linkUrl,
   });
   await post.populate('author', 'name');
+  // AI first-pass triage (fire-and-forget, queue-only — never blocks).
+  screenContent({ targetType: 'post', targetId: post._id, title, body });
   res.status(201).json({ success: true, data: { ...post.toJSON(), userVote: 0 } });
 });
 
@@ -361,6 +365,8 @@ export const addComment = asyncHandler(async (req, res) => {
     /* notifications must never fail the comment */
   }
   await comment.populate('author', 'name');
+  // AI first-pass triage (fire-and-forget, queue-only — never blocks).
+  screenContent({ targetType: 'comment', targetId: comment._id, body });
   res.status(201).json({ success: true, data: { ...comment.toJSON(), userVote: 0 } });
 });
 
@@ -492,6 +498,28 @@ export const voteComment = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result });
 });
 
+// POST /api/community/suggest-channel { title, body? } — Jev picks the best
+// channel for a draft. Suggestion only; the composer decides.
+export const suggestChannelForDraft = asyncHandler(async (req, res) => {
+  const title = String(req.body?.title || '').trim();
+  const body = String(req.body?.body || '').trim();
+  if (title.length < 3) {
+    res.status(400);
+    throw new Error('A title of at least 3 characters is needed to suggest a channel');
+  }
+  if (!process.env.TYPESAFE_API_KEY || !process.env.TYPESAFE_API_KEY.trim()) {
+    res.status(503);
+    throw new Error('Channel suggestions are unavailable right now');
+  }
+  try {
+    const result = await suggestChannel({ title, body });
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(502);
+    throw new Error(err.message || 'Channel suggestion failed. Please try again.');
+  }
+});
+
 // POST /api/community/reports { targetType: post|comment, targetId, reason, detail? }
 // Report someone else's content for admin triage. One report per user/target.
 export const createReport = asyncHandler(async (req, res) => {
@@ -537,10 +565,12 @@ export const createReport = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: report });
 });
 
-// GET /api/community/admin/reports?status=open&page=&limit= — admin triage queue.
+// GET /api/community/admin/reports?status=open&source=&page=&limit= — triage queue.
 export const listReports = asyncHandler(async (req, res) => {
   const status = (req.query.status || 'open').toLowerCase();
   const filter = ['open', 'resolved', 'dismissed'].includes(status) ? { status } : {};
+  const source = (req.query.source || '').toLowerCase();
+  if (['user', 'ai'].includes(source)) filter.source = source;
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
   const total = await Report.countDocuments(filter);

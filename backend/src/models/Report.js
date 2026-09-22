@@ -11,7 +11,13 @@ const reportSchema = new mongoose.Schema(
     reporter: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'reporter is required'],
+      required: false, // null for AI-generated flags (source: 'ai')
+      index: true,
+    },
+    source: {
+      type: String,
+      default: 'user',
+      enum: ['user', 'ai'],
       index: true,
     },
     targetType: {

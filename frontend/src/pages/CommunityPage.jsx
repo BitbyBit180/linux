@@ -13,7 +13,7 @@ import { MobileChannelBar } from '../components/community/CommunityNav.jsx';
 import {
   RecentPosts,
 } from '../components/community/CommunitySidebar.jsx';
-import { listPosts, createPost, votePost } from '../services/communityApi.js';
+import { listPosts, createPost, votePost, suggestChannel } from '../services/communityApi.js';
 
 /* --------------------------------- tokens --------------------------------- */
 
@@ -41,6 +41,8 @@ function Composer({ distros, defaultChannel, posting, onPost, onCancel }) {
   const [linkUrl, setLinkUrl] = useState('');
   const [showLink, setShowLink] = useState(false);
   const [localError, setLocalError] = useState(null);
+  const [suggestion, setSuggestion] = useState(null); // { channel, confidence }
+  const [suggesting, setSuggesting] = useState(false);
 
   // Re-seed the channel when the selected tab changes (and the composer is open)
   useEffect(() => {
@@ -65,6 +67,21 @@ function Composer({ distros, defaultChannel, posting, onPost, onCancel }) {
       body: body.trim() || undefined,
       linkUrl: linkUrl.trim() || undefined,
     });
+  };
+
+  const handleSuggest = async () => {
+    if (suggesting || title.trim().length < 3) return;
+    setSuggesting(true);
+    setSuggestion(null);
+    setLocalError(null);
+    try {
+      const result = await suggestChannel({ title: title.trim(), body: body.trim() });
+      setSuggestion(result);
+    } catch (err) {
+      setLocalError(err.message || 'Channel suggestion failed.');
+    } finally {
+      setSuggesting(false);
+    }
   };
 
   return (
@@ -163,6 +180,26 @@ function Composer({ distros, defaultChannel, posting, onPost, onCancel }) {
           </button>
         )}
 
+        <button
+          type="button"
+          onClick={handleSuggest}
+          disabled={suggesting || title.trim().length < 3}
+          className="transition-colors"
+          style={{
+            fontFamily: MONO,
+            fontSize: '0.72rem',
+            color: THEME.accent,
+            background: 'none',
+            border: `1px dashed ${THEME.accent}66`,
+            borderRadius: 9999,
+            padding: '6px 12px',
+            cursor: suggesting || title.trim().length < 3 ? 'not-allowed' : 'pointer',
+            opacity: suggesting || title.trim().length < 3 ? 0.55 : 1,
+          }}
+        >
+          {suggesting ? 'Suggesting…' : '✨ Suggest channel'}
+        </button>
+
         <div style={{ flex: 1 }} />
         <button
           type="button"
@@ -228,6 +265,46 @@ function Composer({ distros, defaultChannel, posting, onPost, onCancel }) {
             marginTop: 10,
           }}
         />
+      )}
+
+      {suggestion && (
+        <div
+          className="flex flex-wrap items-center"
+          style={{
+            gap: 8,
+            marginTop: 10,
+            fontFamily: MONO,
+            fontSize: '0.72rem',
+            color: THEME.textMuted,
+          }}
+        >
+          <span>
+            Suggested: <span style={{ color: THEME.textMain, fontWeight: 700 }}>d/{suggestion.channel}</span>
+            {typeof suggestion.confidence === 'number' ? ` (${Math.round(suggestion.confidence * 100)}%)` : ''}
+          </span>
+          {suggestion.channel !== channel && (
+            <button
+              type="button"
+              onClick={() => {
+                setChannel(suggestion.channel);
+                setSuggestion(null);
+              }}
+              style={{
+                fontFamily: MONO,
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                color: '#fff',
+                background: `linear-gradient(135deg, ${THEME.accent} 0%, #b83d25 100%)`,
+                border: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: 9999,
+                padding: '4px 12px',
+                cursor: 'pointer',
+              }}
+            >
+              Use it
+            </button>
+          )}
+        </div>
       )}
 
       {localError && (

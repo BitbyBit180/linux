@@ -18,9 +18,11 @@ import {
   getNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  suggestChannelForDraft,
 } from '../controllers/communityController.js';
 import { protect, requireAdmin } from '../middleware/authMiddleware.js';
 import {
+  rateLimit,
   voteLimiter,
   postLimiter,
   commentLimiter,
@@ -40,6 +42,11 @@ router.post('/reports', commentLimiter, createReport);
 router.get('/notifications', getNotifications);
 router.patch('/notifications/read-all', markAllNotificationsRead);
 router.patch('/notifications/:id/read', markNotificationRead);
+router.post(
+  '/suggest-channel',
+  rateLimit({ windowMs: 60 * 1000, max: 20, message: 'Too many suggestions — please wait a moment.' }),
+  suggestChannelForDraft
+);
 router.route('/posts/:id').get(getPost).put(updatePost).delete(deletePost);
 router.post('/posts/:id/vote', voteLimiter, votePost);
 router.post('/posts/:id/comments', commentLimiter, addComment);

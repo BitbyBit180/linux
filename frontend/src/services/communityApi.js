@@ -134,6 +134,14 @@ export async function getChannelStats(channel = 'all') {
   return json.data;
 }
 
+/** POST /api/community/suggest-channel { title, body? } -> { channel, confidence } */
+export async function suggestChannel({ title, body }) {
+  const json = await request('/community/suggest-channel', {
+    method: 'POST',
+    body: { title, body },
+  });
+  return json.data;
+}
 /** POST /api/community/reports { targetType, targetId, reason, detail? } */
 export async function createReport({ targetType, targetId, reason, detail }) {
   const json = await request('/community/reports', {

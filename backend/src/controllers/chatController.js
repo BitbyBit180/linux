@@ -3,6 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { searchReddit } from '../services/redditService.js';
 import { runWebResearch } from '../services/webResearchAgent.js';
 import { synthesizeAnswer } from '../services/synthesizerAgent.js';
+import { filterSources } from '../services/citationAgent.js';
 import { NO_KEY_MESSAGE } from '../services/groqClient.js';
 
 // Chats are private: a mismatch is reported as 404 so we don't leak existence.
@@ -137,10 +138,14 @@ export const sendMessage = asyncHandler(async (req, res) => {
     sources.push(s);
   }
 
+  // Relevance screen: drop cited sources Jev judges off-topic (keeps all
+  // on doubt or failure — the filter must never strip everything).
+  const screened = await filterSources({ question: content, sources });
+
   const assistantMessage = {
     role: 'assistant',
     content: answer.content,
-    sources,
+    sources: screened.sources,
   };
   chat.messages.push(assistantMessage);
   if (chat.title === 'New chat') {
@@ -153,6 +158,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     `[chat] chat=${chat._id} reddit=${redditStage.ms}ms(n=${redditResults.length}) ` +
       `web=${webStage.ms}ms(tok=${webResearch.usage?.total_tokens || 0}) ` +
       `synth=${synthMs}ms(tok=${answer.usage?.total_tokens || 0}) ` +
+      `citations=dropped:${screened.dropped}/${sources.length} ` +
       `total=${Date.now() - started}ms tokens=${tokens}`
   );
 

@@ -151,5 +151,11 @@ Set `JWT_SECRET` and `GROQ_API_KEY` in `backend/.env` (optional `GROQ_MODEL`, de
 | POST | `/api/community/posts/:id/comments` `{ body, parentId? }` | comment or reply |
 | PUT/DELETE | `/api/community/comments/:id` | edit/delete (author or admin) |
 | POST | `/api/community/comments/:id/vote` `{ value: 1\|-1\|0 }` | comment voting |
+| POST | `/api/community/suggest-channel` `{ title, body? }` | Jev channel suggestion for a draft (suggestion only) |
+| POST | `/api/community/reports` `{ targetType, targetId, reason, detail? }` | report a post/comment (one per user/target; user + AI flags share the queue) |
+| GET | `/api/community/notifications` | own reply/comment notifications + `unreadCount` |
+| PATCH | `/api/community/notifications/:id/read`, `/read-all` | mark read |
+| GET | `/api/community/admin/audit` | admin-only append-only moderation log |
+| GET/PATCH | `/api/community/admin/reports?status=&source=` | admin triage queue (user + AI flags), resolve/dismiss |
 
 See `backend/README.md` for details and curl examples.
