@@ -672,6 +672,11 @@ function Sidebar({
   overlay = false,
   open = false,
   onClose,
+  // History load state: 'loading' on first open (never show a bare empty
+  // list while the fetch is in flight), 'error' with retry on failure.
+  chatsLoading = false,
+  chatsError = null,
+  onRetryChats,
 }) {
   const [hoveredId, setHoveredId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -826,7 +831,53 @@ function Sidebar({
 
         {/* History list */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px 10px' }}>
-          {chats.length === 0 && (
+          {chatsLoading && chats.length === 0 && (
+            <p
+              style={{
+                fontFamily: MONO,
+                fontSize: '0.72rem',
+                color: THEME.textMuted,
+                textAlign: 'center',
+                padding: '18px 8px',
+                margin: 0,
+              }}
+            >
+              Loading chats…
+            </p>
+          )}
+          {chatsError && chats.length === 0 && !chatsLoading && (
+            <div style={{ textAlign: 'center', padding: '14px 8px' }}>
+              <p
+                style={{
+                  fontFamily: MONO,
+                  fontSize: '0.7rem',
+                  color: THEME.accent,
+                  margin: '0 0 8px',
+                  lineHeight: 1.6,
+                }}
+              >
+                Couldn&apos;t load chats.
+              </p>
+              <button
+                type="button"
+                onClick={onRetryChats}
+                style={{
+                  fontFamily: MONO,
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  color: THEME.textMain,
+                  background: 'rgba(255,255,255,0.07)',
+                  border: `1px solid ${LINE}`,
+                  borderRadius: 9999,
+                  padding: '5px 14px',
+                  cursor: 'pointer',
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {!chatsLoading && !chatsError && chats.length === 0 && (
             <p
               style={{
                 fontFamily: MONO,
@@ -1198,6 +1249,10 @@ export default function ChatPage({ onNavigate }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null); // chat object
   const [deleting, setDeleting] = useState(false);
+  // History load state — loading/error/empty are three distinct UI states so
+  // a failed first fetch never looks like "no chats".
+  const [chatsLoading, setChatsLoading] = useState(true);
+  const [chatsError, setChatsError] = useState(null);
   // Progressive answer reveal: { full, shown } — the assistant message is
   // revealed word-group by word-group instead of popping in all at once.
   const [reveal, setReveal] = useState(null);
@@ -1211,11 +1266,22 @@ export default function ChatPage({ onNavigate }) {
   /* ------------------------------ data loading ----------------------------- */
 
   const refreshChats = useCallback(async () => {
+    setChatsLoading(true);
+    setChatsError(null);
     try {
       const list = await listChats();
       setChats(list);
     } catch (err) {
-      if (err.status === 401) logout();
+      if (err.status === 401) {
+        logout();
+        return;
+      }
+      // Non-auth failures used to vanish silently, leaving a bare empty
+      // list on first open. Surface them with a retry instead.
+      console.error('[chat] failed to load history:', err.message);
+      setChatsError(err.message || 'Could not load chats.');
+    } finally {
+      setChatsLoading(false);
     }
   }, [logout]);
 
@@ -1450,6 +1516,9 @@ export default function ChatPage({ onNavigate }) {
         overlay={isMobile}
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
+        chatsLoading={chatsLoading}
+        chatsError={chatsError}
+        onRetryChats={refreshChats}
       />
 
       {/* Mobile drawer backdrop */}
