@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import HomePage from './pages/HomePage.jsx';
-import FlavoursPage from './pages/FlavoursPage.jsx';
-import DistroDetailPage from './pages/DistroDetailPage.jsx';
-import ComparePage from './pages/ComparePage.jsx';
-import AuthPage from './pages/AuthPage.jsx';
-import ChatPage from './pages/ChatPage.jsx';
-import CommunityPage from './pages/CommunityPage.jsx';
-import PostDetailPage from './pages/PostDetailPage.jsx';
-import QuizPage from './pages/QuizPage.jsx';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { THEME, MONO } from './theme/designTokens.js';
+
+// Route-split: each page loads on demand so the initial bundle stays small.
+// (Vite emits one chunk per page; see the build output.)
+const HomePage = lazy(() => import('./pages/HomePage.jsx'));
+const FlavoursPage = lazy(() => import('./pages/FlavoursPage.jsx'));
+const DistroDetailPage = lazy(() => import('./pages/DistroDetailPage.jsx'));
+const ComparePage = lazy(() => import('./pages/ComparePage.jsx'));
+const AuthPage = lazy(() => import('./pages/AuthPage.jsx'));
+const ChatPage = lazy(() => import('./pages/ChatPage.jsx'));
+const CommunityPage = lazy(() => import('./pages/CommunityPage.jsx'));
+const PostDetailPage = lazy(() => import('./pages/PostDetailPage.jsx'));
+const QuizPage = lazy(() => import('./pages/QuizPage.jsx'));
 
 function normalizeRoute(pathname, hash) {
   const path = (pathname || '').toLowerCase();
@@ -88,6 +92,21 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-transparent text-[#F0F4F8]">
+      <Suspense
+        fallback={
+          <div
+            className="flex items-center justify-center"
+            style={{
+              minHeight: '100vh',
+              fontFamily: MONO,
+              fontSize: '0.8rem',
+              color: THEME.textMuted,
+            }}
+          >
+            Loading…
+          </div>
+        }
+      >
       {isDistroDetail ? (
         <DistroDetailPage distroId={distroId} onNavigate={navigate} />
       ) : isFlavours ? (
@@ -107,6 +126,7 @@ export default function App() {
       ) : (
         <HomePage onNavigate={navigate} />
       )}
+      </Suspense>
     </div>
   );
 }

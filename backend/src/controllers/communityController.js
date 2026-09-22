@@ -84,7 +84,11 @@ export const listPosts = asyncHandler(async (req, res) => {
 
   const filter = {};
   if (channel !== 'all') filter.channel = channel;
-  if (search) filter.title = new RegExp(escapeRegex(search), 'i');
+  // Title + body match so search actually finds discussions, not just headlines.
+  if (search) {
+    const rx = new RegExp(escapeRegex(search), 'i');
+    filter.$or = [{ title: rx }, { body: rx }];
+  }
 
   const total = await Post.countDocuments(filter);
   const totalPages = Math.ceil(total / limit);
