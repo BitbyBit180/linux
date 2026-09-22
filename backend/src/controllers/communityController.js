@@ -3,6 +3,8 @@ import Comment from '../models/Comment.js';
 import Vote, { applyVote } from '../models/Vote.js';
 import Flavour from '../models/Flavour.js';
 import AuditLog from '../models/AuditLog.js';
+import Report from '../models/Report.js';
+import Notification from '../models/Notification.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { logAdminAction, isAdminOnOthersContent } from '../utils/auditLog.js';
 
@@ -330,6 +332,34 @@ export const addComment = asyncHandler(async (req, res) => {
     body,
   });
   await Post.findByIdAndUpdate(post._id, { $inc: { commentCount: 1 } });
+  // Notify the post author and (for replies) the parent author — never self.
+  try {
+    const recipients = new Map(); // userId -> 'comment' | 'reply'
+    const postAuthorId = post.author?._id?.toString() || post.author?.toString();
+    if (postAuthorId && postAuthorId !== req.user._id.toString()) {
+      recipients.set(postAuthorId, parentId ? 'reply' : 'comment');
+    }
+    if (parentId) {
+      const parent = await Comment.findById(parentId).select('author').lean();
+      const parentAuthorId = parent?.author?.toString();
+      if (parentAuthorId && parentAuthorId !== req.user._id.toString()) {
+        recipients.set(parentAuthorId, 'reply');
+      }
+    }
+    if (recipients.size > 0) {
+      await Notification.insertMany(
+        [...recipients].map(([userId, type]) => ({
+          user: userId,
+          type,
+          actor: req.user._id,
+          post: post._id,
+          comment: comment._id,
+        }))
+      );
+    }
+  } catch {
+    /* notifications must never fail the comment */
+  }
   await comment.populate('author', 'name');
   res.status(201).json({ success: true, data: { ...comment.toJSON(), userVote: 0 } });
 });
@@ -460,4 +490,140 @@ export const voteComment = asyncHandler(async (req, res) => {
     value,
   });
   res.json({ success: true, data: result });
+});
+
+// POST /api/community/reports { targetType: post|comment, targetId, reason, detail? }
+// Report someone else's content for admin triage. One report per user/target.
+export const createReport = asyncHandler(async (req, res) => {
+  const targetType = req.body?.targetType;
+  if (!['post', 'comment'].includes(targetType)) {
+    res.status(400);
+    throw new Error('targetType must be post or comment');
+  }
+  const targetId = req.body?.targetId;
+  const Target = targetType === 'post' ? Post : Comment;
+  const target = await Target.findById(targetId).select('author').lean();
+  if (!target) {
+    res.status(404);
+    throw new Error(`${targetType === 'post' ? 'Post' : 'Comment'} not found`);
+  }
+  const ownerId = target.author?._id?.toString() || target.author?.toString();
+  if (ownerId === req.user._id.toString()) {
+    res.status(400);
+    throw new Error('You cannot report your own content');
+  }
+  const reason = req.body?.reason;
+  if (!['spam', 'harassment', 'off-topic', 'wrong-channel', 'other'].includes(reason)) {
+    res.status(400);
+    throw new Error('reason must be spam, harassment, off-topic, wrong-channel, or other');
+  }
+  const detail = String(req.body?.detail || '').trim().slice(0, 500);
+  const existing = await Report.findOne({
+    reporter: req.user._id,
+    targetType,
+    targetId,
+  }).lean();
+  if (existing) {
+    res.status(409);
+    throw new Error('You have already reported this');
+  }
+  const report = await Report.create({
+    reporter: req.user._id,
+    targetType,
+    targetId,
+    reason,
+    detail,
+  });
+  res.status(201).json({ success: true, data: report });
+});
+
+// GET /api/community/admin/reports?status=open&page=&limit= — admin triage queue.
+export const listReports = asyncHandler(async (req, res) => {
+  const status = (req.query.status || 'open').toLowerCase();
+  const filter = ['open', 'resolved', 'dismissed'].includes(status) ? { status } : {};
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+  const total = await Report.countDocuments(filter);
+  const reports = await Report.find(filter)
+    .populate('reporter', 'name')
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .lean();
+  res.json({
+    success: true,
+    data: {
+      reports: reports.map((r) => ({ ...r, id: r._id.toString() })),
+      page,
+      totalPages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+    },
+  });
+});
+
+// PATCH /api/community/admin/reports/:id { status: resolved|dismissed }
+export const updateReportStatus = asyncHandler(async (req, res) => {
+  const status = req.body?.status;
+  if (!['resolved', 'dismissed'].includes(status)) {
+    res.status(400);
+    throw new Error('status must be resolved or dismissed');
+  }
+  const report = await Report.findByIdAndUpdate(
+    req.params.id,
+    { status },
+    { new: true }
+  ).populate('reporter', 'name');
+  if (!report) {
+    res.status(404);
+    throw new Error('Report not found');
+  }
+  res.json({ success: true, data: report });
+});
+
+// GET /api/community/notifications?page=&limit= — own feed, newest first.
+export const getNotifications = asyncHandler(async (req, res) => {
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 15, 1), 50);
+  const filter = { user: req.user._id };
+  const [total, unreadCount, items] = await Promise.all([
+    Notification.countDocuments(filter),
+    Notification.countDocuments({ ...filter, read: false }),
+    Notification.find(filter)
+      .populate('actor', 'name')
+      .populate('post', 'title channel')
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+  ]);
+  res.json({
+    success: true,
+    data: {
+      notifications: items.map((n) => ({ ...n, id: n._id.toString() })),
+      unreadCount,
+      page,
+      totalPages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+    },
+  });
+});
+
+// PATCH /api/community/notifications/:id/read — mark one as read (own only).
+export const markNotificationRead = asyncHandler(async (req, res) => {
+  const note = await Notification.findOneAndUpdate(
+    { _id: req.params.id, user: req.user._id },
+    { read: true },
+    { new: true }
+  );
+  if (!note) {
+    res.status(404);
+    throw new Error('Notification not found');
+  }
+  res.json({ success: true, data: note });
+});
+
+// PATCH /api/community/notifications/read-all — mark everything read.
+export const markAllNotificationsRead = asyncHandler(async (req, res) => {
+  await Notification.updateMany({ user: req.user._id, read: false }, { read: true });
+  res.json({ success: true, message: 'All notifications marked as read' });
 });

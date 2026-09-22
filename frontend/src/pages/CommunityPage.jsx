@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth.js';
 import { useDistros } from '../hooks/useDistros.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
 import PostCard from '../components/community/PostCard.jsx';
+import NotificationBell from '../components/community/NotificationBell.jsx';
 import CommunityShell from '../components/community/CommunityShell.jsx';
 import { RailCard } from '../components/community/CommunityShell.jsx';
 import CommunityNav from '../components/community/CommunityNav.jsx';
@@ -520,6 +521,7 @@ export default function CommunityPage({ onNavigate }) {
             }}
           />
         </div>
+        <NotificationBell onOpenPost={(id) => onNavigate?.(`/community/${id}`)} />
       </div>
 
       {/* Inline error */}

@@ -12,6 +12,12 @@ import {
   voteComment,
   getChannelStats,
   getAuditLog,
+  createReport,
+  listReports,
+  updateReportStatus,
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
 } from '../controllers/communityController.js';
 import { protect, requireAdmin } from '../middleware/authMiddleware.js';
 import {
@@ -28,6 +34,12 @@ router.use(protect);
 router.route('/posts').get(listPosts).post(postLimiter, createPost);
 router.get('/stats', getChannelStats);
 router.get('/admin/audit', requireAdmin, getAuditLog);
+router.get('/admin/reports', requireAdmin, listReports);
+router.patch('/admin/reports/:id', requireAdmin, updateReportStatus);
+router.post('/reports', commentLimiter, createReport);
+router.get('/notifications', getNotifications);
+router.patch('/notifications/read-all', markAllNotificationsRead);
+router.patch('/notifications/:id/read', markNotificationRead);
 router.route('/posts/:id').get(getPost).put(updatePost).delete(deletePost);
 router.post('/posts/:id/vote', voteLimiter, votePost);
 router.post('/posts/:id/comments', commentLimiter, addComment);

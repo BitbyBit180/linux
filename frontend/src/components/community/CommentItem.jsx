@@ -3,6 +3,7 @@ import { ChevronUp, ChevronDown, Minus, Plus as PlusIcon } from 'lucide-react';
 import { THEME, LINE, MONO } from '../../theme/designTokens.js';
 import { timeAgo } from '../../utils/timeAgo.js';
 import { UserAvatar } from './Avatar.jsx';
+import ReportButton from './ReportButton.jsx';
 
 const scoreColor = (score) => {
   if (score > 0) return THEME.accent;
@@ -302,6 +303,9 @@ export default function CommentItem({
                     />
                     <TextAction label="Delete" onClick={() => onDelete?.(comment.id)} />
                   </>
+                )}
+                {!isOwner && comment.id && !String(comment.id).startsWith('optimistic-') && (
+                  <ReportButton targetType="comment" targetId={comment.id} />
                 )}
               </div>
             )}

@@ -25,6 +25,8 @@ import { useAuth } from '../hooks/useAuth.js';
 import { useDistros } from '../hooks/useDistros.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
 import VotePill from '../components/community/VotePill.jsx';
+import NotificationBell from '../components/community/NotificationBell.jsx';
+import ReportButton from '../components/community/ReportButton.jsx';
 import { ChannelAvatar } from '../components/community/Avatar.jsx';
 import { RowAction } from '../components/community/PostCard.jsx';
 import CommentItem from '../components/community/CommentItem.jsx';
@@ -819,7 +821,8 @@ export default function PostDetailPage({ postId, onNavigate }) {
         />
       }
     >
-      {/* Back */}
+      {/* Back + notifications */}
+      <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
       <button
         type="button"
         onClick={() => onNavigate?.('/community')}
@@ -833,7 +836,6 @@ export default function PostDetailPage({ postId, onNavigate }) {
           background: 'rgba(255,255,255,0.04)',
           color: THEME.textMuted,
           cursor: 'pointer',
-          marginBottom: 14,
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.color = THEME.textMain;
@@ -846,6 +848,8 @@ export default function PostDetailPage({ postId, onNavigate }) {
       >
         <ArrowLeft size={16} />
       </button>
+      <NotificationBell onOpenPost={(id) => id !== postId && onNavigate?.(`/community/${id}`)} />
+      </div>
 
         {loading ? (
           <p
@@ -1001,6 +1005,9 @@ export default function PostDetailPage({ postId, onNavigate }) {
                         onClick={() => setConfirmDelete(true)}
                       />
                     </>
+                  )}
+                  {!isOwner && post?.id && (
+                    <ReportButton targetType="post" targetId={post.id} />
                   )}
                 </div>
               )}

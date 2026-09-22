@@ -133,3 +133,36 @@ export async function getChannelStats(channel = 'all') {
   );
   return json.data;
 }
+
+/** POST /api/community/reports { targetType, targetId, reason, detail? } */
+export async function createReport({ targetType, targetId, reason, detail }) {
+  const json = await request('/community/reports', {
+    method: 'POST',
+    body: { targetType, targetId, reason, detail },
+  });
+  return json.data;
+}
+
+/** GET /api/community/notifications -> { notifications, unreadCount, ... } */
+export async function getNotifications({ page = 1, limit = 10 } = {}) {
+  const json = await request(
+    `/community/notifications?page=${page}&limit=${limit}`
+  );
+  return json.data;
+}
+
+/** PATCH /api/community/notifications/:id/read */
+export async function markNotificationRead(id) {
+  const json = await request(`/community/notifications/${encodeURIComponent(id)}/read`, {
+    method: 'PATCH',
+  });
+  return json.data;
+}
+
+/** PATCH /api/community/notifications/read-all */
+export async function markAllNotificationsRead() {
+  const json = await request('/community/notifications/read-all', {
+    method: 'PATCH',
+  });
+  return json;
+}
