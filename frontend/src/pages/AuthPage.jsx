@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Bot, AlertCircle } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import { useAuth } from '../hooks/useAuth.js';
