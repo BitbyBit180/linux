@@ -134,7 +134,7 @@ Set `JWT_SECRET` and `GROQ_API_KEY` in `backend/.env` (optional `GROQ_MODEL`, de
 | POST | `/api/auth/register` `{ name, email, password }` | sends 6-digit signup OTP, no token yet |
 | POST | `/api/auth/verify-registration` `{ email, token }` | verifies OTP → `{ token, user }` |
 | POST | `/api/auth/resend-verification` `{ email }` | re-sends signup OTP (generic 200) |
-| POST | `/api/auth/google` `{ credential }` | Google ID token → find-or-link-or-create → `{ token, user }` |
+| POST | `/api/auth/google` `{ code }` | OAuth popup code → server-side exchange → find-or-link-or-create → `{ token, user }` |
 | POST | `/api/auth/login` `{ email, password }` | → `{ token, user }` (403 `EMAIL_NOT_VERIFIED` if OTP pending) |
 | GET | `/api/auth/me` | current user (Bearer token) |
 | GET/POST | `/api/chat` | list chats / create empty chat |

@@ -18,9 +18,12 @@ OTP unchanged.
    Legacy accounts (no `emailVerified` field) are grandfathered in.
 
 ## Sign in with Google
-1. GIS button on `AuthPage` (hidden when `VITE_GOOGLE_CLIENT_ID` is unset) →
-   ID token → `POST /api/auth/google { credential }`.
-2. Backend verifies via Google `tokeninfo` (audience = `GOOGLE_CLIENT_ID`,
+1. Themed "Continue with Google" button (official G, mono pill; hidden when
+   `VITE_GOOGLE_CLIENT_ID` is unset) → opens Google's real sign-in page in a
+   **separate popup window** (GIS OAuth code flow, `ux_mode: 'popup'`)
+   → one-time code → `POST /api/auth/google { code }`.
+2. Backend exchanges the code server-side (secret never leaves the server),
+   verifies the ID token via Google `tokeninfo` (audience = `GOOGLE_CLIENT_ID`,
    `email_verified`, expiry) — plain fetch, no SDK.
 3. **Merge rule (same email = same account):**
    - `googleId` match → login.

@@ -472,15 +472,19 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
     }
   };
 
-  // Sign in with Google (GIS One Tap). Skipped entirely when no client id is
-  // configured — the form works standalone. The button is custom-styled to
-  // the theme; clicking it opens Google's account chooser via prompt().
-  const handleGoogle = async (response) => {
-    if (busy) return;
+  // Sign in with Google (GIS OAuth popup flow). Skipped entirely when no
+  // client id is configured — the form works standalone. The themed button
+  // opens Google's real sign-in page in a separate popup window; Google
+  // returns a one-time code that the backend exchanges server-side.
+  const handleGoogle = async ({ code }) => {
+    if (busy || !code) {
+      if (!code) setError('Google sign-in was cancelled. Please try again.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await googleLogin(response?.credential);
+      await googleLogin({ code });
       onAuthSuccess?.();
     } catch (err) {
       setError(err.message || 'Google sign-in failed. Please try again.');
@@ -490,46 +494,29 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
   };
   const handleGoogleClick = () => {
     if (busy) return;
-    if (!window.google?.accounts?.id) {
+    if (!window.google?.accounts?.oauth2) {
       setError('Google sign-in is still loading. Please try again in a moment.');
       return;
     }
     setError(null);
-    window.google.accounts.id.prompt((notification) => {
-      try {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          setError(
-            'Google sign-in was blocked or dismissed — allow third-party sign-in and try again, or use email instead.'
-          );
-        }
-      } catch {
-        /* older GIS without Moment API — the callback still fires on success */
-      }
+    const client = window.google.accounts.oauth2.initCodeClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'openid email profile',
+      ux_mode: 'popup',
+      callback: handleGoogle,
     });
+    client.requestCode();
   };
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || view !== 'auth') return;
-    let cancelled = false;
-    const init = () => {
-      if (cancelled || !window.google?.accounts?.id) return;
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        data_type: 'standard',
-        callback: handleGoogle,
-      });
-    };
-    if (window.google?.accounts?.id) init();
-    else {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = init;
-      document.head.appendChild(script);
-    }
-    return () => {
-      cancelled = true;
-    };
+    // The GIS script exposes the oauth2 namespace used by handleGoogleClick.
+    if (window.google?.accounts?.oauth2) return;
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+    return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 

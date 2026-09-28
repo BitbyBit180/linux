@@ -63,7 +63,7 @@ export function useAuth() {
     [signIn]
   );
 
-  const googleLogin = useCallback((credential) => signIn(apiGoogleLogin, credential), [signIn]);
+  const googleLogin = useCallback(({ code }) => signIn(apiGoogleLogin, { code }), [signIn]);
 
   const logout = useCallback(() => {
     clearAuth();

@@ -212,9 +212,13 @@ export const verifyResetToken = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Code verified — choose a new password.' });
 });
 
-// POST /api/auth/google { credential } — Sign in with Google.
-// Verifies the ID token with Google (plain fetch, repo convention), then
-// find-or-link-or-create by verified email:
+// POST /api/auth/google { credential?, code? } — Sign in with Google.
+// Two client flows land here:
+// - { credential }: a Google ID token (verified directly), or
+// - { code }: an OAuth authorization code from the GIS popup flow, exchanged
+//   server-side for tokens (needs GOOGLE_CLIENT_SECRET).
+// Either way the ID token is verified (audience, expiry, email_verified),
+// then find-or-link-or-create by verified email:
 // - googleId match → straight login
 // - email match on a password account → LINK: attach googleId, mark the
 //   email verified (Google proved ownership), keep the password working
@@ -227,15 +231,47 @@ export const googleAuth = asyncHandler(async (req, res) => {
     throw new Error('Google sign-in is not configured. Add GOOGLE_CLIENT_ID to backend/.env');
   }
   const credential = String(req.body?.credential || '').trim();
-  if (!credential) {
+  const code = String(req.body?.code || '').trim();
+  if (!credential && !code) {
     res.status(400);
-    throw new Error('Google credential is required');
+    throw new Error('Google credential or authorization code is required');
+  }
+
+  // Popup flow: trade the one-time code for tokens (server-side only —
+  // the secret never leaves the backend).
+  let idToken = credential;
+  if (!idToken) {
+    const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+    if (!clientSecret) {
+      res.status(503);
+      throw new Error('Google sign-in is not configured. Add GOOGLE_CLIENT_SECRET to backend/.env');
+    }
+    try {
+      const r = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: clientId,
+          client_secret: clientSecret,
+          grant_type: 'authorization_code',
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!r.ok) throw new Error('exchange rejected');
+      const tokens = await r.json();
+      if (!tokens.id_token) throw new Error('no id_token');
+      idToken = String(tokens.id_token);
+    } catch {
+      res.status(401);
+      throw new Error('Google verification failed. Please try again.');
+    }
   }
 
   let claims;
   try {
     const r = await fetch(
-      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
       { signal: AbortSignal.timeout(10000) }
     );
     if (!r.ok) throw new Error('tokeninfo rejected');

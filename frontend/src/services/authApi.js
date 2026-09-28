@@ -111,14 +111,15 @@ export async function resendVerification(email) {
 }
 
 /**
- * POST /api/auth/google { credential } -> { token, user }
- * credential is the Google ID token from the GIS button. Links by verified
+ * POST /api/auth/google { code } -> { token, user }
+ * code is the one-time OAuth authorization code from the GIS popup flow.
+ * The backend exchanges it (server-side secret) and links by verified
  * email: password accounts gain Google sign-in, new emails get an account.
  */
-export async function googleLogin(credential) {
+export async function googleLogin({ code }) {
   const json = await request('/auth/google', {
     method: 'POST',
-    body: { credential },
+    body: { code },
   });
   return { token: json.token, user: json.data };
 }
