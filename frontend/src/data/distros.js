@@ -20,7 +20,7 @@ export const DISTROS = [
     license: 'FOSS (GPL family) + optional proprietary drivers',
     architectures: 'x86_64, ARM64, s390x, ppc64el',
     installCmd: 'sudo apt update && sudo apt install <package>',
-    cardBg: '/ubuntu-card-bg.png',
+    cardBg: '/ubuntu-card-bg.webp',
     preview: 'https://upload.wikimedia.org/wikipedia/commons/a/ad/Ubuntu_24.04_LTS_default_desktop_-_English.png',
     description: 'Ubuntu is a complete Linux operating system, freely available with both community and professional support. Renowned for its polished GNOME desktop, extensive software center, and predictable release cadence, it powers millions of personal computers and servers worldwide.',
     keyFeatures: [
@@ -51,7 +51,7 @@ export const DISTROS = [
     license: 'FOSS (DFSG-free only)',
     architectures: 'x86_64, i386, arm64, armel, armhf, mips64el, mipsel, ppc64el, s390x',
     installCmd: 'sudo apt update && sudo apt install <package>',
-    cardBg: '/debian-card-bg.png',
+    cardBg: '/debian-card-bg.webp',
     preview: 'https://upload.wikimedia.org/wikipedia/commons/f/fc/Debian_12_Bookworm_GNOME_Desktop_English.png',
     description: 'Debian is a complete Free Operating System renowned for its strict adherence to Unix and free software philosophies, legendary stability, and immense archive of over 59,000 packages. It serves as the bedrock upon which Ubuntu, Kali, Mint, and hundreds of other distributions are constructed.',
     keyFeatures: [
@@ -81,7 +81,7 @@ export const DISTROS = [
     license: 'FOSS (GPL family)',
     architectures: 'x86_64, ARM64, Apple Silicon, Raspberry Pi',
     installCmd: 'sudo apt update && sudo apt install -y kali-tools-top10',
-    cardBg: '/kali-card-bg.png',
+    cardBg: '/kali-card-bg.webp',
     preview: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Kali-linux-2023.1-desktop.png/1280px-Kali-linux-2023.1-desktop.png',
     description: 'Kali Linux is an open-source, Debian-based Linux distribution geared towards various information security tasks, such as Penetration Testing, Security Research, Computer Forensics, and Reverse Engineering. Developed by Offensive Security, it is the premier industry standard for cybersecurity professionals.',
     keyFeatures: [
@@ -112,7 +112,7 @@ export const DISTROS = [
     license: 'FOSS (GPL family)',
     architectures: 'x86_64',
     installCmd: 'sudo pacman -Syu <package>',
-    cardBg: '/arch-card-bg.png',
+    cardBg: '/arch-card-bg.webp',
     preview: 'https://upload.wikimedia.org/wikipedia/commons/7/7a/Arch_Linux_with_KDE.png',
     description: 'Arch Linux is an independently developed x86-64 general-purpose GNU/Linux distribution that strives to provide the latest stable versions of software by following a rolling-release model. Adhering to the KISS principle ("Keep It Simple, Stupid"), it empowers the user to construct a tailored system from scratch.',
     keyFeatures: [
@@ -143,7 +143,7 @@ export const DISTROS = [
     license: 'FOSS (free-licensed software only)',
     architectures: 'x86_64, ARM64, PowerPC, s390x',
     installCmd: 'sudo dnf install <package>',
-    cardBg: '/fedora-card-bg.png',
+    cardBg: '/fedora-card-bg.webp',
     preview: 'https://upload.wikimedia.org/wikipedia/commons/8/82/Fedora_Workstation_40.png',
     description: 'Fedora Workstation is a reliable, user-friendly, and powerful operating system for laptops and desktop computers. It provides developers and tech enthusiasts with the latest open-source software technologies, serving as the direct upstream innovation testbed for Red Hat Enterprise Linux (RHEL).',
     keyFeatures: [
@@ -174,7 +174,7 @@ export const DISTROS = [
     license: 'FOSS (GPL family)',
     architectures: 'x86_64',
     installCmd: 'sudo apt update && sudo apt install <package>',
-    cardBg: '/mint-card-bg.png',
+    cardBg: '/mint-card-bg.webp',
     preview: 'https://upload.wikimedia.org/wikipedia/commons/f/f9/Linux_Mint_21_Cinnamon_eng.png',
     description: 'Linux Mint is designed to work out of the box with full multimedia support, an intuitive Cinnamon interface, and exceptional ease of use for transitioning desktop users. It eliminates common pain points for newcomers with automated snapshot backups via Timeshift and user-friendly update management.',
     keyFeatures: [
