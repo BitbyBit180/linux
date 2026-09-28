@@ -28,3 +28,6 @@ dist-ssr
 
 # Local ZCode agent workspace artifacts
 .zcode/
+
+# Google OAuth secrets (never commit)
+client_secret*.json
