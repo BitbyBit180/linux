@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Bot, AlertCircle } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import { useAuth } from '../hooks/useAuth.js';
-import { forgotPassword as apiForgot, resetPassword as apiReset, verifyResetToken as apiVerify } from '../services/authApi.js';
+import { forgotPassword as apiForgot, resetPassword as apiReset, verifyResetToken as apiVerify, resendVerification as apiResend, GOOGLE_CLIENT_ID } from '../services/authApi.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
 
 const inputStyle = {
@@ -277,10 +277,11 @@ function ForgotResetView({
  * to /chat.
  */
 export default function AuthPage({ onAuthSuccess, onNavigate }) {
-  const { login, register } = useAuth();
+  const { login, register, verifyRegistration, googleLogin } = useAuth();
   const [mode, setMode] = useState('login');
-  const [view, setView] = useState('auth'); // auth | forgot | reset
+  const [view, setView] = useState('auth'); // auth | verify-signup | forgot | reset
   const [resetToken, setResetToken] = useState(''); // 6-digit OTP
+  const [signupOtp, setSignupOtp] = useState(''); // registration OTP
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otpVerified, setOtpVerified] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -387,17 +388,112 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
     setBusy(true);
     try {
       if (mode === 'register') {
-        await register(name.trim(), email.trim(), password);
+        // Signup is two-step now: this only emails the OTP — the session
+        // starts after the code is verified (see handleVerifySignup).
+        const json = await register(name.trim(), email.trim(), password);
+        setNotice(json.message || 'Verification code sent — check your email.');
+        setSignupOtp('');
+        setView('verify-signup');
       } else {
         await login(email.trim(), password);
+        onAuthSuccess?.();
       }
-      onAuthSuccess?.();
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.');
+      // Signed up but never verified? Jump straight to the OTP step and
+      // re-send a fresh code instead of dead-ending on an error.
+      if (err.code === 'EMAIL_NOT_VERIFIED') {
+        try {
+          const json = await apiResend(email.trim());
+          setNotice(json.message || 'Verification code sent — check your email.');
+        } catch {
+          setNotice('Enter the 6-digit code from your email.');
+        }
+        setSignupOtp('');
+        setView('verify-signup');
+        setError(null);
+      } else {
+        setError(err.message || 'Something went wrong. Please try again.');
+      }
     } finally {
       setBusy(false);
     }
   };
+
+  const handleVerifySignup = async (code) => {
+    const otp = (code ?? signupOtp).trim();
+    if (!/^\d{6}$/.test(otp) || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await verifyRegistration(email.trim(), otp);
+      onAuthSuccess?.();
+    } catch (err) {
+      setError(err.message || 'Code is incorrect or expired.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleResendSignup = async () => {
+    if (busy || !email.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const json = await apiResend(email.trim());
+      setNotice(json.message);
+    } catch (err) {
+      setError(err.message || 'Could not resend the code. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Sign in with Google (GIS button). Skipped entirely when no client id is
+  // configured — the form works standalone.
+  const googleBtnRef = useRef(null);
+  const handleGoogle = async (response) => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await googleLogin(response?.credential);
+      onAuthSuccess?.();
+    } catch (err) {
+      setError(err.message || 'Google sign-in failed. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || view !== 'auth') return;
+    let cancelled = false;
+    const render = () => {
+      if (cancelled || !window.google?.accounts?.id || !googleBtnRef.current) return;
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogle,
+      });
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        theme: 'filled_black',
+        size: 'large',
+        width: 320,
+        text: 'continue_with',
+      });
+    };
+    if (window.google?.accounts?.id) render();
+    else {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = render;
+      document.head.appendChild(script);
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   return (
     <div
@@ -659,7 +755,109 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
               {mode === 'login' ? 'Create an account' : 'Sign in instead'}
             </button>
           </p>
+
+          {/* Sign in with Google (hidden when no client id is configured) */}
+          {GOOGLE_CLIENT_ID && (
+            <>
+              <div
+                className="flex items-center"
+                style={{ gap: 10, margin: '18px 0 14px' }}
+                aria-hidden="true"
+              >
+                <div style={{ flex: 1, height: 1, background: LINE }} />
+                <span style={{ fontFamily: MONO, fontSize: '0.66rem', color: THEME.textMuted }}>
+                  or
+                </span>
+                <div style={{ flex: 1, height: 1, background: LINE }} />
+              </div>
+              <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 40 }} />
+            </>
+          )}
           </>
+          ) : view === 'verify-signup' ? (
+            /* Registration OTP step — account exists but unverified */
+            <div>
+              {notice && (
+                <p
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: '0.74rem',
+                    color: THEME.textMain,
+                    background: 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${LINE}`,
+                    borderRadius: 10,
+                    padding: '9px 11px',
+                    margin: '0 0 14px',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {notice}
+                </p>
+              )}
+              <p
+                style={{
+                  fontFamily: MONO,
+                  fontSize: '0.74rem',
+                  color: THEME.textMuted,
+                  textAlign: 'center',
+                  margin: '0 0 14px',
+                }}
+              >
+                Enter the 6-digit code sent to {email || 'your email'}.
+              </p>
+              <div style={{ marginBottom: 14 }}>
+                <OtpInput
+                  value={signupOtp}
+                  onChange={setSignupOtp}
+                  onComplete={handleVerifySignup}
+                  disabled={busy}
+                />
+              </div>
+              {error && (
+                <p style={{ fontFamily: MONO, fontSize: '0.72rem', color: THEME.accent, margin: '0 0 12px', textAlign: 'center' }}>
+                  {error}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => handleVerifySignup()}
+                disabled={busy || signupOtp.trim().length !== 6}
+                style={{
+                  width: '100%',
+                  fontFamily: MONO,
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  color: '#fff',
+                  background: `linear-gradient(135deg, ${THEME.accent} 0%, #b83d25 100%)`,
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 9999,
+                  padding: '10px 0',
+                  cursor: busy ? 'wait' : 'pointer',
+                  opacity: busy ? 0.75 : 1,
+                }}
+              >
+                {busy ? 'Verifying…' : 'Verify & create account'}
+              </button>
+              <p style={{ fontFamily: MONO, fontSize: '0.68rem', color: THEME.textMuted, textAlign: 'center', margin: '14px 0 0' }}>
+                Didn&apos;t get a code?{' '}
+                <button
+                  type="button"
+                  onClick={handleResendSignup}
+                  disabled={busy}
+                  style={{ background: 'none', border: 'none', padding: 0, fontFamily: MONO, fontSize: '0.68rem', color: THEME.accent, cursor: 'pointer' }}
+                >
+                  Resend
+                </button>
+                {' · '}
+                <button
+                  type="button"
+                  onClick={() => { setView('auth'); setError(null); setNotice(null); }}
+                  style={{ background: 'none', border: 'none', padding: 0, fontFamily: MONO, fontSize: '0.68rem', color: THEME.accent, cursor: 'pointer' }}
+                >
+                  ← Back to sign in
+                </button>
+              </p>
+            </div>
           ) : (
             /* Forgot / reset views */
             <ForgotResetView

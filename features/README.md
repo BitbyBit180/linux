@@ -11,5 +11,6 @@ One file per feature. Open the file matching the question asked.
 | `ai-chat.md` | DistroPedia AI assistant | `/chat` → `POST /api/chat/:id/messages` |
 | `community.md` | Reddit-style forum per distro | `/community` → `/api/community/*` |
 | `auth.md` | Login, register, OTP password reset | `/login` → `/api/auth/*` |
+| `optimization.md` | Every optimization shipped: images, cache, streaming, keys, recovery | — |
 
 Common wiring for all: `frontend/vite.config.js` proxies `/api → :5000`; every `frontend/src/services/*` uses `VITE_API_URL || '/api'` with fetch-then-fallback to `frontend/src/data/distros.js`; backend `backend/server.js` mounts all routers; design tokens in `frontend/src/theme/designTokens.js`.

@@ -30,6 +30,9 @@ export const errorHandler = (err, req, res, next) => {
   res.status(statusCode).json({
     success: false,
     message: err.message || 'Server error',
+    // String error codes (e.g. EMAIL_NOT_VERIFIED) pass through so the
+    // client can branch; numeric Mongo codes are handled above.
+    ...(typeof err.code === 'string' ? { code: err.code } : {}),
     ...(process.env.NODE_ENV !== 'production' ? { stack: err.stack } : {}),
   });
 };

@@ -67,16 +67,58 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
   if (!res.ok || !json || json.success === false) {
     const err = new Error(json?.message || `Request failed (${res.status})`);
     err.status = res.status;
+    if (typeof json?.code === 'string') err.code = json.code;
     throw err;
   }
   return json;
 }
 
-/** POST /api/auth/register {name, email, password} -> { token, data: user } */
+/** Google OAuth client ID for the GIS button (empty = button hidden). */
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+/**
+ * POST /api/auth/register {name, email, password}
+ * Starts signup and emails a 6-digit OTP — returns NO token.
+ * -> { message, data: { email } }; follow with verifyRegistration().
+ */
 export async function register(name, email, password) {
   const json = await request('/auth/register', {
     method: 'POST',
     body: { name, email, password },
+  });
+  return json;
+}
+
+/**
+ * POST /api/auth/verify-registration { email, token } -> { token, user }
+ * Completes signup after the OTP; signs the user straight in.
+ */
+export async function verifyRegistration(email, token) {
+  const json = await request('/auth/verify-registration', {
+    method: 'POST',
+    body: { email, token },
+  });
+  return { token: json.token, user: json.data };
+}
+
+/** POST /api/auth/resend-verification { email } -> { message } */
+export async function resendVerification(email) {
+  const json = await request('/auth/resend-verification', {
+    method: 'POST',
+    body: { email },
+  });
+  return json;
+}
+
+/**
+ * POST /api/auth/google { credential } -> { token, user }
+ * credential is the Google ID token from the GIS button. Links by verified
+ * email: password accounts gain Google sign-in, new emails get an account.
+ */
+export async function googleLogin(credential) {
+  const json = await request('/auth/google', {
+    method: 'POST',
+    body: { credential },
   });
   return { token: json.token, user: json.data };
 }

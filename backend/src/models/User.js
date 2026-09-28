@@ -16,11 +16,23 @@ const userSchema = new mongoose.Schema(
     },
     passwordHash: {
       type: String,
-      required: [true, 'passwordHash is required'],
+      default: null, // null for Google-only accounts (no password set)
     },
     name: { type: String, default: '' },
     // Admins can moderate (edit/delete) any post or comment.
     isAdmin: { type: Boolean, default: false },
+    // Google account id (sub) for Sign in with Google. Unique + sparse so
+    // password-only accounts (no googleId) never collide on null.
+    googleId: { type: String, default: null, unique: true, sparse: true, index: true },
+    // Email ownership proof. Password signups start false until the
+    // registration OTP is verified; Google sign-ins are true on arrival
+    // (Google verified the address). Legacy accounts predate this field —
+    // absence (undefined) counts as verified so nobody is locked out.
+    emailVerified: { type: Boolean, default: false },
+    // Registration OTP (sha256 of the emailed code) + expiry. Separate
+    // fields from the password-reset token so both flows can coexist.
+    emailOtpHash: { type: String, default: null },
+    emailOtpExpiry: { type: Date, default: null },
     // Password-reset token (sha256 of the emailed token) + expiry.
     resetTokenHash: { type: String, default: null },
     resetTokenExpiry: { type: Date, default: null },
@@ -29,11 +41,16 @@ const userSchema = new mongoose.Schema(
 );
 
 // Shape API JSON: expose `id`, hide internal/password/reset fields.
+// googleId stays hidden (account-linking identifier, not public).
+// emailVerified is exposed so the UI can gate verified-only actions.
 const shapeJSON = (doc, ret) => {
   ret.id = ret._id.toString();
   delete ret.passwordHash;
   delete ret.resetTokenHash;
   delete ret.resetTokenExpiry;
+  delete ret.emailOtpHash;
+  delete ret.emailOtpExpiry;
+  delete ret.googleId;
   delete ret._id;
   delete ret.__v;
   return ret;

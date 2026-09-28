@@ -12,11 +12,13 @@ export const MAX_COMPARE = 4;
 export function useCompare(ids = []) {
   const key = ids.filter(Boolean).join(',');
   const [distros, setDistros] = useState(() => peekDistrosForCompare(ids) || []);
-  const [loading, setLoading] = useState(() => !peekDistrosForCompare(ids));
+  // No ids = nothing to load (picker empty-state), never a spinner.
+  const [loading, setLoading] = useState(() => Boolean(key) && !peekDistrosForCompare(ids));
 
   useEffect(() => {
     if (!key) {
       setDistros([]);
+      setLoading(false);
       return;
     }
     let cancelled = false;
