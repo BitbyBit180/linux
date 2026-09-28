@@ -32,6 +32,7 @@ export const getDistroById = asyncHandler(async (req, res) => {
   if (!distro.installation) {
     distro.installation = buildInstallGuide(distro.toObject());
   }
+  res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
   res.json({ success: true, data: distro });
 });
 
@@ -66,6 +67,7 @@ export const getDistrosForCompare = asyncHandler(async (req, res) => {
     .map((id) => byId.get(id))
     .filter(Boolean);
 
+  res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
   res.json({ success: true, count: data.length, data });
 });
 

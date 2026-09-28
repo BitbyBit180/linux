@@ -42,6 +42,12 @@ const postSchema = new mongoose.Schema(
 // Text index so ?search= can match post titles.
 postSchema.index({ title: 'text' });
 
+// Feed filters always scope by channel first, then sort by recency (new)
+// or score (top), or compute hotScore over the channel slice (hot) —
+// compound indexes keep those slices fast as the collection grows.
+postSchema.index({ channel: 1, createdAt: -1 });
+postSchema.index({ channel: 1, score: -1 });
+
 // Shape API JSON: expose `id`, hide internals. `author` stays as-is —
 // the controller populates it (User's own transform then applies).
 const shapeJSON = (doc, ret) => {

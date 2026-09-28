@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DISTROS } from '../data/distros.js';
-import { getDistroById, getDistros } from '../services/distroApi.js';
+import { getDistroById, getDistros, peekDistroById } from '../services/distroApi.js';
 
 const findLocal = (distroId) =>
   DISTROS.find(
@@ -18,11 +18,13 @@ export function useDistro(distroId) {
   const [otherDistros, setOtherDistros] = useState(() =>
     DISTROS.filter((d) => d.id !== findLocal(distroId).id).slice(0, 4)
   );
-  const [loading, setLoading] = useState(true);
+  // Revisits with a cached detail paint instantly (no skeleton flash);
+  // first visits still show the skeleton while the API responds.
+  const [loading, setLoading] = useState(() => !peekDistroById(distroId));
 
   useEffect(() => {
     setDistro(findLocal(distroId));
-    setLoading(true);
+    setLoading(!peekDistroById(distroId));
     let cancelled = false;
     getDistroById(distroId).then((d) => {
       if (!cancelled && d) {

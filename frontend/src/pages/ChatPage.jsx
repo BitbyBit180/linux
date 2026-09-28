@@ -32,6 +32,8 @@ import {
   deleteChat,
   renameChat,
   sendMessage,
+  sendMessageStream,
+  peekChatList,
 } from '../services/chatApi.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
 import { ChatListSkeleton, ChatMessagesSkeleton } from '../components/Skeleton.jsx';
@@ -516,6 +518,14 @@ const THINKING_WORDS = [
   'Mounting solutions…',
   'Distrowatching…',
 ];
+
+// Live pipeline stages from the SSE stream (see sendMessageStream) — shown
+// in place of the cycling words so the user sees real progress.
+const STREAM_STAGE_LABELS = {
+  research: 'Searching Reddit + knowledge…',
+  synthesizing: 'Writing answer…',
+  citations: 'Checking sources…',
+};
 
 function ThinkingWords() {
   const [i, setI] = useState(0);
@@ -1235,7 +1245,10 @@ export default function ChatPage({ onNavigate }) {
   const isMobile = useMedia('(max-width: 767px)');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const [chats, setChats] = useState([]);
+  // Instant sidebar on revisits: init from the chat-list cache so switching
+  // back skips the skeleton; refreshChats revalidates silently.
+  const [initialChats] = useState(() => peekChatList());
+  const [chats, setChats] = useState(initialChats || []);
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
@@ -1249,17 +1262,24 @@ export default function ChatPage({ onNavigate }) {
   const [deleting, setDeleting] = useState(false);
   // History load state — loading/error/empty are three distinct UI states so
   // a failed first fetch never looks like "no chats".
-  const [chatsLoading, setChatsLoading] = useState(true);
+  const [chatsLoading, setChatsLoading] = useState(!initialChats);
   const [chatsError, setChatsError] = useState(null);
   // Progressive answer reveal: { full, shown } — the assistant message is
   // revealed word-group by word-group instead of popping in all at once.
   const [reveal, setReveal] = useState(null);
+  // Live-stream state: current pipeline stage for the thinking indicator.
+  const [streamStage, setStreamStage] = useState(null); // research|synthesizing|citations
+  // Aborts the in-flight SSE stream when switching chats / unmounting.
+  const streamAbortRef = useRef(null);
 
   const scrollRef = useRef(null);
   const activeIdRef = useRef(activeId);
   useEffect(() => {
     activeIdRef.current = activeId;
   }, [activeId]);
+
+  // Abort any live stream on unmount so it can't write into dead state.
+  useEffect(() => () => streamAbortRef.current?.abort(), []);
 
   /* ------------------------------ data loading ----------------------------- */
 
@@ -1354,6 +1374,11 @@ export default function ChatPage({ onNavigate }) {
     // Switching mid-send is allowed: the in-flight reply is only rendered
     // if this chat is still active when it arrives (see handleSend).
     if (id === activeId || loadingChat || creating) return;
+    // Stop the live stream — its updates are guarded, but no point burning
+    // tokens for a chat the user just left.
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = null;
+    setStreamStage(null);
     setError(null);
     setLoadingChat(true);
     try {
@@ -1420,21 +1445,15 @@ export default function ChatPage({ onNavigate }) {
     setSending(true);
     setSendingChatId(activeIdRef.current);
     setReveal(null);
+    setStreamStage(null);
 
     // Optimistic render: show the user's message immediately
     setMessages((prev) => [...prev, { role: 'user', content, optimistic: true }]);
 
     let chatId = activeIdRef.current;
-    try {
-      // First message with no active chat -> create one on the fly
-      if (!chatId) {
-        const chat = await createChat();
-        chatId = chat.id;
-        activeIdRef.current = chatId;
-        setActiveId(chatId);
-      }
-      setSendingChatId(chatId);
-
+    // Legacy (non-streaming) completion — also the fallback when the SSE
+    // stream dies before its first token (typewriter reveal, as before).
+    const finishLegacy = async () => {
       const data = await sendMessage(chatId, content);
 
       // Only render the reply if the user hasn't navigated to another chat
@@ -1449,18 +1468,96 @@ export default function ChatPage({ onNavigate }) {
       }
       // Title may have changed server-side -> refresh history list
       refreshChats();
+    };
+
+    try {
+      // First message with no active chat -> create one on the fly
+      if (!chatId) {
+        const chat = await createChat();
+        chatId = chat.id;
+        activeIdRef.current = chatId;
+        setActiveId(chatId);
+      }
+      setSendingChatId(chatId);
+
+      // Swap the optimistic bubble for the real user message + a live
+      // streaming placeholder that tokens append into.
+      setMessages((prev) => [
+        ...prev.filter((m) => !m.optimistic),
+        { role: 'user', content },
+        { role: 'assistant', content: '', streaming: true },
+      ]);
+
+      const aborter = new AbortController();
+      streamAbortRef.current = aborter;
+      let streamed = '';
+      try {
+        const data = await sendMessageStream(chatId, content, {
+          signal: aborter.signal,
+          onStage: (stage) => {
+            if (activeIdRef.current === chatId) setStreamStage(stage);
+          },
+          onToken: (t) => {
+            if (!t || activeIdRef.current !== chatId) return;
+            streamed += t;
+            const snap = streamed;
+            setMessages((prev) => {
+              const next = [...prev];
+              const last = next[next.length - 1];
+              if (last && last.streaming) {
+                next[next.length - 1] = { ...last, content: snap };
+              }
+              return next;
+            });
+          },
+        });
+        streamAbortRef.current = null;
+        if (activeIdRef.current === chatId) {
+          // Replace the streaming placeholder with the final message
+          // (authoritative content + sources); append if it went missing.
+          setMessages((prev) => {
+            const base = prev.filter((m) => !m.optimistic);
+            const last = base[base.length - 1];
+            if (last && last.streaming) {
+              base[base.length - 1] = data.assistantMessage;
+              return base;
+            }
+            return [...base, data.userMessage, data.assistantMessage];
+          });
+          setStreamStage(null);
+        }
+        // Title may have changed server-side -> refresh history list
+        refreshChats();
+      } catch (streamErr) {
+        streamAbortRef.current = null;
+        if (streamErr?.name === 'AbortError' || activeIdRef.current !== chatId) return;
+        if (!streamed) {
+          // Stream died before any token — restore the optimistic bubble
+          // and retry over the legacy endpoint (proxies without SSE, etc.).
+          setMessages((prev) => [
+            ...prev.filter(
+              (m) => !m.streaming && !(m.role === 'user' && !m.optimistic && m.content === content)
+            ),
+            { role: 'user', content, optimistic: true },
+          ]);
+          await finishLegacy();
+          return;
+        }
+        throw streamErr;
+      }
     } catch (err) {
       if (err.status === 401) {
         logout();
         return;
       }
-      // Roll back the optimistic message and surface the error
-      setMessages((prev) => prev.filter((m) => !m.optimistic));
+      // Roll back the optimistic/streaming messages and surface the error
+      setMessages((prev) => prev.filter((m) => !m.optimistic && !m.streaming));
       setDraft((prev) => prev || content);
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setSending(false);
       setSendingChatId(null);
+      setStreamStage(null);
     }
   };
 
@@ -1694,19 +1791,37 @@ export default function ChatPage({ onNavigate }) {
                     />
                   );
                 })}
-                {sending && sendingChatId === activeId && (
-                  <div
-                    className="dp-fade flex items-center"
-                    style={{ gap: 10, padding: '8px 0 14px' }}
-                  >
-                    <ThinkingWords />
-                    <span style={{ display: 'inline-flex', gap: 3 }}>
-                      <span className="dp-dot" />
-                      <span className="dp-dot" />
-                      <span className="dp-dot" />
-                    </span>
-                  </div>
-                )}
+                {sending &&
+                  sendingChatId === activeId &&
+                  !(
+                    messages.length > 0 &&
+                    messages[messages.length - 1].streaming &&
+                    messages[messages.length - 1].content
+                  ) && (
+                    <div
+                      className="dp-fade flex items-center"
+                      style={{ gap: 10, padding: '8px 0 14px' }}
+                    >
+                      {streamStage && STREAM_STAGE_LABELS[streamStage] ? (
+                        <span
+                          style={{
+                            fontFamily: MONO,
+                            fontSize: '0.76rem',
+                            color: THEME.textMuted,
+                          }}
+                        >
+                          {STREAM_STAGE_LABELS[streamStage]}
+                        </span>
+                      ) : (
+                        <ThinkingWords />
+                      )}
+                      <span style={{ display: 'inline-flex', gap: 3 }}>
+                        <span className="dp-dot" />
+                        <span className="dp-dot" />
+                        <span className="dp-dot" />
+                      </span>
+                    </div>
+                  )}
               </div>
             </div>
 

@@ -51,19 +51,18 @@ export async function searchReddit(query, { limit = 4 } = {}) {
 
     const picked = posts.slice(0, limit);
 
-    // Enrich the first 3 with top comments (sequential — stays inside budget).
-    const results = [];
-    for (const [i, post] of picked.entries()) {
-      const topComments = i < 3 ? await fetchTopComments(post.id, 2500) : [];
-      results.push({
-        title: clip(post.title, 200),
-        subreddit: post.subreddit || '',
-        url: `https://www.reddit.com${post.permalink || ''}`,
-        snippet: clip(post.selftext, 400),
-        topComments,
-      });
-    }
-    return results;
+    // Enrich the first 3 with top comments (in parallel — sequential
+    // fetches could burn the whole 8s budget on their own).
+    const commentsList = await Promise.all(
+      picked.map((post, i) => (i < 3 ? fetchTopComments(post.id, 2500) : Promise.resolve([])))
+    );
+    return picked.map((post, i) => ({
+      title: clip(post.title, 200),
+      subreddit: post.subreddit || '',
+      url: `https://www.reddit.com${post.permalink || ''}`,
+      snippet: clip(post.selftext, 400),
+      topComments: commentsList[i],
+    }));
   };
 
   try {

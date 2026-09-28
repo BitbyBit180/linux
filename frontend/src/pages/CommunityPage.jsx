@@ -14,7 +14,7 @@ import { MobileChannelBar } from '../components/community/CommunityNav.jsx';
 import {
   RecentPosts,
 } from '../components/community/CommunitySidebar.jsx';
-import { listPosts, createPost, votePost, suggestChannel } from '../services/communityApi.js';
+import { listPosts, createPost, votePost, suggestChannel, peekPosts } from '../services/communityApi.js';
 
 /* --------------------------------- tokens --------------------------------- */
 
@@ -340,10 +340,15 @@ export default function CommunityPage({ onNavigate }) {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState(''); // applied after debounce
 
-  const [posts, setPosts] = useState([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // Instant first paint on revisits: init from the feed cache (default
+  // filters) so switching back skips the skeleton; fetchPage revalidates.
+  const [initialFeed] = useState(() =>
+    peekPosts({ channel: 'all', sort: 'hot', search: '', page: 1, limit: PAGE_SIZE })
+  );
+  const [posts, setPosts] = useState(initialFeed?.posts || []);
+  const [page, setPage] = useState(initialFeed?.page || 1);
+  const [hasMore, setHasMore] = useState(Boolean(initialFeed?.hasMore));
+  const [loading, setLoading] = useState(!initialFeed);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
 
@@ -396,6 +401,26 @@ export default function CommunityPage({ onNavigate }) {
   useEffect(() => {
     fetchPage(1);
   }, [fetchPage]);
+
+  // Infinite scroll: auto-append the next page when the sentinel scrolls
+  // near the viewport. The manual "Load more" button below stays as the
+  // fallback (no IntersectionObserver, or a failed auto-load).
+  const sentinelRef = useRef(null);
+  useEffect(() => {
+    if (!hasMore || loading || loadingMore) return;
+    const el = sentinelRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          fetchPage(page + 1, { append: true });
+        }
+      },
+      { rootMargin: '600px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [hasMore, loading, loadingMore, page, fetchPage]);
 
   /* --------------------------------- actions -------------------------------- */
 
@@ -662,6 +687,8 @@ export default function CommunityPage({ onNavigate }) {
         )}
       </div>
 
+      {/* Infinite-scroll sentinel (auto-loads next page; see effect above) */}
+      {hasMore && !loading && <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />}
       {/* Pagination */}
       {hasMore && !loading && (
         <div className="flex justify-center" style={{ marginTop: 20 }}>

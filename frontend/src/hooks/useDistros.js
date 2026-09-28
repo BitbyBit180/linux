@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { DISTROS, POPULAR_DISTROS } from '../data/distros.js';
-import { getDistros, getPopularDistros, getCategories } from '../services/distroApi.js';
+import {
+  getDistros,
+  getPopularDistros,
+  getCategories,
+  peekDistros,
+  peekPopularDistros,
+  peekCategories,
+} from '../services/distroApi.js';
 
 export const DEFAULT_CATEGORIES = [
   'All',
@@ -14,13 +21,18 @@ export const DEFAULT_CATEGORIES = [
 /**
  * Loads the distro catalogue from the API.
  * Falls back to local static data when the backend is unreachable,
- * so pages always render.
+ * so pages always render. Reads the API cache first: revisits paint
+ * instantly with zero skeleton flash, then revalidate silently.
  */
 export function useDistros() {
-  const [distros, setDistros] = useState(DISTROS);
-  const [popularDistros, setPopularDistros] = useState(POPULAR_DISTROS);
-  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
-  const [loading, setLoading] = useState(true);
+  const [distros, setDistros] = useState(() => peekDistros() || DISTROS);
+  const [popularDistros, setPopularDistros] = useState(
+    () => peekPopularDistros() || POPULAR_DISTROS
+  );
+  const [categories, setCategories] = useState(() => peekCategories() || DEFAULT_CATEGORIES);
+  const [loading, setLoading] = useState(
+    () => !peekDistros() || !peekPopularDistros() || !peekCategories()
+  );
 
   useEffect(() => {
     let cancelled = false;

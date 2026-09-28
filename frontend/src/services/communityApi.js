@@ -2,10 +2,15 @@
 // All endpoints are protected: every request carries the Bearer token
 // from authApi (localStorage 'dp_token').
 import { getToken } from './authApi.js';
+import { cached, peek, invalidate } from '../utils/apiCache.js';
 
 // In dev, Vite proxies /api -> http://localhost:5000 (see vite.config.js).
 // In production set VITE_API_URL=https://your-api-host/api
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
+// Feed content is live (votes, new posts), so the TTL is short: revisits
+// within 30s paint instantly, older visits revalidate in the background.
+const FEED_TTL = 30 * 1000;
 
 async function request(path, { method = 'GET', body } = {}) {
   const headers = {};
@@ -34,21 +39,31 @@ async function request(path, { method = 'GET', body } = {}) {
   return json;
 }
 
+const postsKey = ({ channel = 'all', sort = 'hot', search = '', page = 1, limit = 10 } = {}) =>
+  `community:posts:${channel}|${sort}|${search}|${page}|${limit}`;
+
 /**
  * GET /api/community/posts?channel=&sort=&search=&page=&limit=
  * -> { data: { posts, page, totalPages, hasMore } }
  */
 export async function listPosts({ channel = 'all', sort = 'hot', search = '', page = 1, limit = 10 } = {}) {
-  const params = new URLSearchParams({
-    channel,
-    sort,
-    search,
-    page: String(page),
-    limit: String(limit),
+  const params = { channel, sort, search, page, limit };
+  return cached(postsKey(params), FEED_TTL, async () => {
+    const qs = new URLSearchParams({
+      channel,
+      sort,
+      search,
+      page: String(page),
+      limit: String(limit),
+    });
+    const json = await request(`/community/posts?${qs.toString()}`);
+    return json.data;
   });
-  const json = await request(`/community/posts?${params.toString()}`);
-  return json.data;
 }
+
+/** Synchronous cache read — CommunityPage inits its feed from this so
+ *  switching back paints instantly with no skeleton flash. */
+export const peekPosts = (params) => peek(postsKey(params));
 
 /** POST /api/community/posts { channel, title, body?, linkUrl? } -> post */
 export async function createPost({ channel, title, body, linkUrl }) {
@@ -56,13 +71,17 @@ export async function createPost({ channel, title, body, linkUrl }) {
     method: 'POST',
     body: { channel, title, body, linkUrl },
   });
+  invalidate('community:posts');
   return json.data;
 }
 
 /** GET /api/community/posts/:id -> { data: { post, comments } } */
 export async function getPost(id) {
-  const json = await request(`/community/posts/${encodeURIComponent(id)}`);
-  return json.data;
+  const key = `community:post:${encodeURIComponent(id)}`;
+  return cached(key, FEED_TTL, async () => {
+    const json = await request(`/community/posts/${encodeURIComponent(id)}`);
+    return json.data;
+  });
 }
 
 /** PUT /api/community/posts/:id { title?, body?, linkUrl? } -> post */
@@ -71,6 +90,8 @@ export async function updatePost(id, { title, body, linkUrl } = {}) {
     method: 'PUT',
     body: { title, body, linkUrl },
   });
+  invalidate('community:post');
+  invalidate('community:posts');
   return json.data;
 }
 
@@ -79,6 +100,8 @@ export async function deletePost(id) {
   const json = await request(`/community/posts/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
+  invalidate('community:post');
+  invalidate('community:posts');
   return json;
 }
 
@@ -88,6 +111,9 @@ export async function votePost(id, value) {
     method: 'POST',
     body: { value },
   });
+  // Votes are optimistic in the UI; bust the detail cache so a revisit
+  // shows the server's authoritative score.
+  invalidate('community:post');
   return json.data;
 }
 
@@ -97,6 +123,8 @@ export async function addComment(postId, { body, parentId } = {}) {
     `/community/posts/${encodeURIComponent(postId)}/comments`,
     { method: 'POST', body: { body, parentId } }
   );
+  invalidate('community:post');
+  invalidate('community:posts');
   return json.data;
 }
 
@@ -106,6 +134,7 @@ export async function updateComment(id, body) {
     method: 'PUT',
     body: { body },
   });
+  invalidate('community:post');
   return json.data;
 }
 
@@ -114,6 +143,8 @@ export async function deleteComment(id) {
   const json = await request(`/community/comments/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
+  invalidate('community:post');
+  invalidate('community:posts');
   return json;
 }
 
@@ -123,6 +154,7 @@ export async function voteComment(id, value) {
     method: 'POST',
     body: { value },
   });
+  invalidate('community:post');
   return json.data;
 }
 

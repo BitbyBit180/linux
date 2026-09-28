@@ -2,7 +2,7 @@ import Chat from '../models/Chat.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { searchReddit } from '../services/redditService.js';
 import { runWebResearch } from '../services/webResearchAgent.js';
-import { synthesizeAnswer } from '../services/synthesizerAgent.js';
+import { synthesizeAnswer, synthesizeAnswerStream } from '../services/synthesizerAgent.js';
 import { filterSources } from '../services/citationAgent.js';
 import { NO_KEY_MESSAGE } from '../services/groqClient.js';
 
@@ -164,3 +164,145 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   res.json({ success: true, data: { userMessage, assistantMessage } });
 });
+
+// POST /api/chat/:id/messages/stream { content }
+// SSE twin of sendMessage: same pipeline, but the synthesizer's tokens are
+// relayed live (`token` events) instead of waiting for the full answer.
+// Events: `stage` {stage}, `token` {text}, `done` {userMessage,
+// assistantMessage}, `error` {message}. The legacy JSON endpoint above is
+// untouched — the client falls back to it when streaming is unavailable.
+//
+// NOTE: not wrapped in asyncHandler on purpose — once SSE headers flush,
+// errors must go out as `error` events, not errorMiddleware JSON.
+export const sendMessageStream = async (req, res) => {
+  // ---- pre-SSE phase: normal JSON errors, same contract as sendMessage ----
+  let chat;
+  let content;
+  try {
+    chat = await Chat.findById(req.params.id);
+    if (!chat || !chat.user.equals(req.user._id)) {
+      res.status(404).json({ success: false, message: 'Chat not found' });
+      return;
+    }
+    content = (req.body?.content || '').trim();
+    if (!content) {
+      res.status(400).json({ success: false, message: 'Message content is required' });
+      return;
+    }
+    if (!process.env.GROQ_API_KEY || !process.env.GROQ_API_KEY.trim()) {
+      res.status(503).json({ success: false, message: NO_KEY_MESSAGE });
+      return;
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message || 'Stream failed to start' });
+    return;
+  }
+
+  const history = chat.messages.map((m) => ({ role: m.role, text: m.content }));
+
+  const userMessage = { role: 'user', content, sources: [] };
+  chat.messages.push(userMessage);
+  await chat.save(); // persisted first so the client can retry on failure
+
+  // ---- SSE phase ----
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no', // don't let proxies buffer the tokens
+  });
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+  const send = (event, data) => {
+    if (!res.writableEnded && !res.destroyed) {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    }
+  };
+  // Heartbeat so idle stretches (research stage) don't trip proxy timeouts.
+  const heartbeat = setInterval(() => {
+    if (!res.writableEnded && !res.destroyed) res.write(': ping\n\n');
+  }, 15000);
+
+  const abortCtrl = new AbortController();
+  let clientGone = false;
+  req.on('close', () => {
+    clientGone = true;
+    abortCtrl.abort();
+  });
+
+  const started = Date.now();
+  try {
+    send('stage', { stage: 'research' });
+    const [redditResults, webResearch] = await Promise.all([
+      searchReddit(content),
+      runWebResearch({ question: content, history }),
+    ]);
+    if (clientGone) return;
+
+    send('stage', { stage: 'synthesizing' });
+    let streamed = '';
+    let answer;
+    try {
+      answer = await synthesizeAnswerStream(
+        {
+          question: content,
+          history,
+          redditResults,
+          webFindings: webResearch.findings,
+          onToken: (delta) => {
+            streamed += delta;
+            send('token', { text: delta });
+          },
+        },
+        { signal: abortCtrl.signal }
+      );
+    } catch (err) {
+      // Upstream died mid-stream. If nothing arrived, the client falls back
+      // to the legacy endpoint; the saved user message makes that a retry.
+      send('error', { message: err.message || 'AI assistant failed. Please try again.' });
+      return;
+    }
+    if (clientGone) return;
+
+    send('stage', { stage: 'citations' });
+    const redditThreads = redditResults
+      .slice(0, 3)
+      .map((r) => ({ title: r.title, url: r.url }));
+    const seen = new Set();
+    const sources = [];
+    for (const s of [...(webResearch.sources || []), ...redditThreads]) {
+      if (!s?.url || seen.has(s.url)) continue;
+      seen.add(s.url);
+      sources.push(s);
+    }
+
+    const screened = await filterSources({ question: content, sources });
+    if (clientGone) return;
+
+    const assistantMessage = {
+      role: 'assistant',
+      content: answer.content,
+      sources: screened.sources,
+    };
+    chat.messages.push(assistantMessage);
+    if (chat.title === 'New chat') {
+      chat.title = content.slice(0, 48);
+    }
+    await chat.save();
+
+    const tokens =
+      (webResearch.usage?.total_tokens || 0) + (answer.usage?.total_tokens || 0);
+    console.log(
+      `[chat:stream] chat=${chat._id} streamed=${streamed.length}chars ` +
+        `citations=dropped:${screened.dropped}/${sources.length} ` +
+        `total=${Date.now() - started}ms tokens=${tokens}`
+    );
+
+    send('done', { userMessage, assistantMessage });
+  } catch (err) {
+    send('error', { message: err.message || 'Stream failed. Please try again.' });
+  } finally {
+    clearInterval(heartbeat);
+    res.end();
+  }
+};

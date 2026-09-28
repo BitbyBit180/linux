@@ -6,6 +6,7 @@ import {
   renameChat,
   deleteChat,
   sendMessage,
+  sendMessageStream,
 } from '../controllers/chatController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { chatMessageLimiter } from '../middleware/rateLimit.js';
@@ -19,5 +20,6 @@ router.route('/').get(getChats).post(createChat);
 router.route('/:id').get(getChat).delete(deleteChat);
 router.put('/:id/rename', renameChat);
 router.post('/:id/messages', chatMessageLimiter, sendMessage);
+router.post('/:id/messages/stream', chatMessageLimiter, sendMessageStream);
 
 export default router;

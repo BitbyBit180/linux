@@ -31,6 +31,7 @@ export const getFlavours = asyncHandler(async (req, res) => {
     Flavour.find(filter).sort(sortOption).skip((pageNum - 1) * limitNum).limit(limitNum),
   ]);
 
+  res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
   res.json({
     success: true,
     count: flavours.length,
@@ -44,12 +45,14 @@ export const getFlavours = asyncHandler(async (req, res) => {
 // GET /api/flavours/popular
 export const getPopularFlavours = asyncHandler(async (req, res) => {
   const flavours = await Flavour.find({ popular: true }).sort({ name: 1 });
+  res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
   res.json({ success: true, count: flavours.length, data: flavours });
 });
 
 // GET /api/flavours/categories
 export const getFlavourCategories = asyncHandler(async (req, res) => {
   const categories = await Flavour.distinct('category');
+  res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
   res.json({ success: true, data: ['All', ...categories.sort()] });
 });
 
