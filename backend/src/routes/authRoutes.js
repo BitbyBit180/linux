@@ -1,10 +1,7 @@
 import express from 'express';
 import {
   register,
-  verifyRegistration,
-  resendVerification,
   login,
-  googleAuth,
   getMe,
   forgotPassword,
   verifyResetToken,
@@ -23,10 +20,7 @@ const authLimiter = rateLimit({
 const router = express.Router();
 
 router.post('/register', authLimiter, register);
-router.post('/verify-registration', authLimiter, verifyRegistration);
-router.post('/resend-verification', authLimiter, resendVerification);
 router.post('/login', authLimiter, login);
-router.post('/google', authLimiter, googleAuth);
 router.post('/forgot-password', authLimiter, forgotPassword);
 router.post('/verify-reset-token', authLimiter, verifyResetToken);
 router.post('/reset-password', authLimiter, resetPassword);

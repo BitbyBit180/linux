@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Bot, AlertCircle } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import { useAuth } from '../hooks/useAuth.js';
-import { forgotPassword as apiForgot, resetPassword as apiReset, verifyResetToken as apiVerify, resendVerification as apiResend, GOOGLE_CLIENT_ID } from '../services/authApi.js';
+import { forgotPassword as apiForgot, resetPassword as apiReset, verifyResetToken as apiVerify } from '../services/authApi.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
 
 const inputStyle = {
@@ -29,30 +29,6 @@ const labelStyle = {
   color: THEME.textMuted,
   marginBottom: 6,
 };
-
-// Official multicolor Google "G" (brand asset) for the themed button.
-function GoogleGIcon({ size = 18 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-        fill="#4285F4"
-      />
-      <path
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-        fill="#34A853"
-      />
-      <path
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-        fill="#EA4335"
-      />
-    </svg>
-  );
-}
 
 function AuthField({ label, type, value, onChange, autoFocus, autoComplete }) {
   return (
@@ -301,11 +277,10 @@ function ForgotResetView({
  * to /chat.
  */
 export default function AuthPage({ onAuthSuccess, onNavigate }) {
-  const { login, register, verifyRegistration, googleLogin } = useAuth();
+  const { login, register } = useAuth();
   const [mode, setMode] = useState('login');
-  const [view, setView] = useState('auth'); // auth | verify-signup | forgot | reset
+  const [view, setView] = useState('auth'); // auth | forgot | reset
   const [resetToken, setResetToken] = useState(''); // 6-digit OTP
-  const [signupOtp, setSignupOtp] = useState(''); // registration OTP
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otpVerified, setOtpVerified] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -412,113 +387,17 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
     setBusy(true);
     try {
       if (mode === 'register') {
-        // Signup is two-step now: this only emails the OTP — the session
-        // starts after the code is verified (see handleVerifySignup).
-        const json = await register(name.trim(), email.trim(), password);
-        setNotice(json.message || 'Verification code sent — check your email.');
-        setSignupOtp('');
-        setView('verify-signup');
+        await register(name.trim(), email.trim(), password);
       } else {
         await login(email.trim(), password);
-        onAuthSuccess?.();
       }
-    } catch (err) {
-      // Signed up but never verified? Jump straight to the OTP step and
-      // re-send a fresh code instead of dead-ending on an error.
-      if (err.code === 'EMAIL_NOT_VERIFIED') {
-        try {
-          const json = await apiResend(email.trim());
-          setNotice(json.message || 'Verification code sent — check your email.');
-        } catch {
-          setNotice('Enter the 6-digit code from your email.');
-        }
-        setSignupOtp('');
-        setView('verify-signup');
-        setError(null);
-      } else {
-        setError(err.message || 'Something went wrong. Please try again.');
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleVerifySignup = async (code) => {
-    const otp = (code ?? signupOtp).trim();
-    if (!/^\d{6}$/.test(otp) || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await verifyRegistration(email.trim(), otp);
       onAuthSuccess?.();
     } catch (err) {
-      setError(err.message || 'Code is incorrect or expired.');
+      setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setBusy(false);
     }
   };
-
-  const handleResendSignup = async () => {
-    if (busy || !email.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const json = await apiResend(email.trim());
-      setNotice(json.message);
-    } catch (err) {
-      setError(err.message || 'Could not resend the code. Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Sign in with Google (GIS OAuth popup flow). Skipped entirely when no
-  // client id is configured — the form works standalone. The themed button
-  // opens Google's real sign-in page in a separate popup window; Google
-  // returns a one-time code that the backend exchanges server-side.
-  const handleGoogle = async ({ code }) => {
-    if (busy || !code) {
-      if (!code) setError('Google sign-in was cancelled. Please try again.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await googleLogin({ code });
-      onAuthSuccess?.();
-    } catch (err) {
-      setError(err.message || 'Google sign-in failed. Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  };
-  const handleGoogleClick = () => {
-    if (busy) return;
-    if (!window.google?.accounts?.oauth2) {
-      setError('Google sign-in is still loading. Please try again in a moment.');
-      return;
-    }
-    setError(null);
-    const client = window.google.accounts.oauth2.initCodeClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: 'openid email profile',
-      ux_mode: 'popup',
-      callback: handleGoogle,
-    });
-    client.requestCode();
-  };
-  useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || view !== 'auth') return;
-    // The GIS script exposes the oauth2 namespace used by handleGoogleClick.
-    if (window.google?.accounts?.oauth2) return;
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
-    return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
 
   return (
     <div
@@ -780,146 +659,7 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
               {mode === 'login' ? 'Create an account' : 'Sign in instead'}
             </button>
           </p>
-
-          {/* Sign in with Google (hidden when no client id is configured) */}
-          {GOOGLE_CLIENT_ID && (
-            <>
-              <div
-                className="flex items-center"
-                style={{ gap: 10, margin: '18px 0 14px' }}
-                aria-hidden="true"
-              >
-                <div style={{ flex: 1, height: 1, background: LINE }} />
-                <span style={{ fontFamily: MONO, fontSize: '0.66rem', color: THEME.textMuted }}>
-                  or
-                </span>
-                <div style={{ flex: 1, height: 1, background: LINE }} />
-              </div>
-              <div
-                style={{ display: 'flex', justifyContent: 'center', minHeight: 40 }}
-              >
-                <button
-                  type="button"
-                  onClick={handleGoogleClick}
-                  disabled={busy}
-                  className="flex items-center justify-center transition-all"
-                  style={{
-                    gap: 10,
-                    width: '100%',
-                    fontFamily: MONO,
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.02em',
-                    color: THEME.textMain,
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    border: `1px solid ${LINE_SOFT}`,
-                    borderRadius: 9999,
-                    padding: '10px 0',
-                    cursor: busy ? 'wait' : 'pointer',
-                    opacity: busy ? 0.6 : 1,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!busy) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                    e.currentTarget.style.borderColor = LINE_SOFT;
-                  }}
-                >
-                  <GoogleGIcon size={17} />
-                  Continue with Google
-                </button>
-              </div>
-            </>
-          )}
           </>
-          ) : view === 'verify-signup' ? (
-            /* Registration OTP step — account exists but unverified */
-            <div>
-              {notice && (
-                <p
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: '0.74rem',
-                    color: THEME.textMain,
-                    background: 'rgba(255,255,255,0.05)',
-                    border: `1px solid ${LINE}`,
-                    borderRadius: 10,
-                    padding: '9px 11px',
-                    margin: '0 0 14px',
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {notice}
-                </p>
-              )}
-              <p
-                style={{
-                  fontFamily: MONO,
-                  fontSize: '0.74rem',
-                  color: THEME.textMuted,
-                  textAlign: 'center',
-                  margin: '0 0 14px',
-                }}
-              >
-                Enter the 6-digit code sent to {email || 'your email'}.
-              </p>
-              <div style={{ marginBottom: 14 }}>
-                <OtpInput
-                  value={signupOtp}
-                  onChange={setSignupOtp}
-                  onComplete={handleVerifySignup}
-                  disabled={busy}
-                />
-              </div>
-              {error && (
-                <p style={{ fontFamily: MONO, fontSize: '0.72rem', color: THEME.accent, margin: '0 0 12px', textAlign: 'center' }}>
-                  {error}
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => handleVerifySignup()}
-                disabled={busy || signupOtp.trim().length !== 6}
-                style={{
-                  width: '100%',
-                  fontFamily: MONO,
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  color: '#fff',
-                  background: `linear-gradient(135deg, ${THEME.accent} 0%, #b83d25 100%)`,
-                  border: '1px solid rgba(255,255,255,0.25)',
-                  borderRadius: 9999,
-                  padding: '10px 0',
-                  cursor: busy ? 'wait' : 'pointer',
-                  opacity: busy ? 0.75 : 1,
-                }}
-              >
-                {busy ? 'Verifying…' : 'Verify & create account'}
-              </button>
-              <p style={{ fontFamily: MONO, fontSize: '0.68rem', color: THEME.textMuted, textAlign: 'center', margin: '14px 0 0' }}>
-                Didn&apos;t get a code?{' '}
-                <button
-                  type="button"
-                  onClick={handleResendSignup}
-                  disabled={busy}
-                  style={{ background: 'none', border: 'none', padding: 0, fontFamily: MONO, fontSize: '0.68rem', color: THEME.accent, cursor: 'pointer' }}
-                >
-                  Resend
-                </button>
-                {' · '}
-                <button
-                  type="button"
-                  onClick={() => { setView('auth'); setError(null); setNotice(null); }}
-                  style={{ background: 'none', border: 'none', padding: 0, fontFamily: MONO, fontSize: '0.68rem', color: THEME.accent, cursor: 'pointer' }}
-                >
-                  ← Back to sign in
-                </button>
-              </p>
-            </div>
           ) : (
             /* Forgot / reset views */
             <ForgotResetView
