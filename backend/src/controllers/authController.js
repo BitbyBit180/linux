@@ -258,7 +258,16 @@ export const googleAuth = asyncHandler(async (req, res) => {
         }),
         signal: AbortSignal.timeout(10000),
       });
-      if (!r.ok) throw new Error('exchange rejected');
+      if (!r.ok) {
+        let detail = '';
+        try {
+          detail = JSON.stringify(await r.json());
+        } catch {
+          detail = `http ${r.status}`;
+        }
+        console.error(`[google] code exchange failed: ${detail}`);
+        throw new Error('exchange rejected');
+      }
       const tokens = await r.json();
       if (!tokens.id_token) throw new Error('no id_token');
       idToken = String(tokens.id_token);
