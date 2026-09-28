@@ -132,6 +132,7 @@ Set `JWT_SECRET` and `GROQ_API_KEY` in `backend/.env` (optional `GROQ_MODEL`, de
 | Method | Path | Notes |
 |---|---|---|
 | POST | `/api/auth/register` `{ name, email, password }` | → `{ token, user }` |
+| POST | `/api/auth/google` `{ credential }` | Google One Tap ID token → find-or-link-or-create → `{ token, user }` |
 | POST | `/api/auth/login` `{ email, password }` | → `{ token, user }` |
 | GET | `/api/auth/me` | current user (Bearer token) |
 | GET/POST | `/api/chat` | list chats / create empty chat |

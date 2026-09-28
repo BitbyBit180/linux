@@ -16,11 +16,14 @@ const userSchema = new mongoose.Schema(
     },
     passwordHash: {
       type: String,
-      required: [true, 'passwordHash is required'],
+      default: null, // null for Google-only accounts (no password set)
     },
     name: { type: String, default: '' },
     // Admins can moderate (edit/delete) any post or comment.
     isAdmin: { type: Boolean, default: false },
+    // Google account id (sub) for Sign in with Google. Unique + sparse so
+    // password-only accounts (no googleId) never collide on null.
+    googleId: { type: String, default: null, unique: true, sparse: true, index: true },
     // Password-reset token (sha256 of the emailed token) + expiry.
     resetTokenHash: { type: String, default: null },
     resetTokenExpiry: { type: Date, default: null },
@@ -29,11 +32,13 @@ const userSchema = new mongoose.Schema(
 );
 
 // Shape API JSON: expose `id`, hide internal/password/reset fields.
+// googleId stays hidden (account-linking identifier, not public).
 const shapeJSON = (doc, ret) => {
   ret.id = ret._id.toString();
   delete ret.passwordHash;
   delete ret.resetTokenHash;
   delete ret.resetTokenExpiry;
+  delete ret.googleId;
   delete ret._id;
   delete ret.__v;
   return ret;

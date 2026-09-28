@@ -60,11 +60,83 @@ export const login = asyncHandler(async (req, res) => {
     res.status(401);
     throw new Error('Invalid email or password');
   };
-  if (!user) badCreds();
+  if (!user || !user.passwordHash) badCreds();
 
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) badCreds();
 
+  respondWithToken(user, res);
+});
+
+// POST /api/auth/google { credential } — Sign in with Google (One Tap).
+// Verifies the ID token with Google (plain fetch, repo convention), then
+// find-or-link-or-create by verified email:
+// - googleId match → straight login
+// - email match on a password account → LINK: attach googleId (Google proved
+//   ownership), keep the password working — one account, two login methods
+// - unknown email → create a Google-only account (no passwordHash)
+// Always responds like login: { success, token, data: user }.
+export const googleAuth = asyncHandler(async (req, res) => {
+  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  if (!clientId) {
+    res.status(503);
+    throw new Error('Google sign-in is not configured. Add GOOGLE_CLIENT_ID to backend/.env');
+  }
+  const credential = String(req.body?.credential || '').trim();
+  if (!credential) {
+    res.status(400);
+    throw new Error('Google credential is required');
+  }
+
+  let claims;
+  try {
+    const r = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    if (!r.ok) throw new Error('tokeninfo rejected');
+    claims = await r.json();
+  } catch {
+    res.status(401);
+    throw new Error('Google verification failed. Please try again.');
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (
+    claims.aud !== clientId ||
+    claims.email_verified !== 'true' ||
+    Number(claims.exp) < nowSec ||
+    !claims.email ||
+    !claims.sub
+  ) {
+    res.status(401);
+    throw new Error('Google account could not be verified.');
+  }
+
+  const emailNorm = String(claims.email).toLowerCase();
+  let user =
+    (await User.findOne({ googleId: claims.sub })) ||
+    (await User.findOne({ email: emailNorm }));
+  if (user) {
+    user.googleId = user.googleId || claims.sub;
+    if (!user.name && claims.name) user.name = String(claims.name).slice(0, 80);
+    await user.save();
+  } else {
+    try {
+      user = await User.create({
+        email: emailNorm,
+        name: String(claims.name || '').slice(0, 80),
+        googleId: claims.sub,
+      });
+    } catch (err) {
+      // Parallel first-logins for the same email: link the winner's doc.
+      if (err?.code !== 11000) throw err;
+      user = await User.findOne({ email: emailNorm });
+      if (!user) throw err;
+      user.googleId = user.googleId || claims.sub;
+      await user.save();
+    }
+  }
   respondWithToken(user, res);
 });
 

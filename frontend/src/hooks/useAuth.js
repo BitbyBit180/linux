@@ -6,6 +6,7 @@ import {
   clearAuth,
   login as apiLogin,
   register as apiRegister,
+  googleLogin as apiGoogleLogin,
 } from '../services/authApi.js';
 
 // Module-level listener set so every useAuth() instance (e.g. AuthPage and
@@ -47,11 +48,19 @@ export function useAuth() {
     return { token, user };
   }, []);
 
+  const googleLogin = useCallback(async (credential) => {
+    const { token, user } = await apiGoogleLogin(credential);
+    setAuth(token, user);
+    setAuthState({ token, user });
+    emitAuthChange();
+    return { token, user };
+  }, []);
+
   const logout = useCallback(() => {
     clearAuth();
     setAuthState({ token: null, user: null });
     emitAuthChange();
   }, []);
 
-  return { user: auth.user, token: auth.token, login, register, logout };
+  return { user: auth.user, token: auth.token, login, register, googleLogin, logout };
 }

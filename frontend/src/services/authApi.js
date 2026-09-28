@@ -72,6 +72,9 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
   return json;
 }
 
+/** Google OAuth client ID for the One Tap prompt (empty = button hidden). */
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
 /** POST /api/auth/register {name, email, password} -> { token, data: user } */
 export async function register(name, email, password) {
   const json = await request('/auth/register', {
@@ -86,6 +89,19 @@ export async function login(email, password) {
   const json = await request('/auth/login', {
     method: 'POST',
     body: { email, password },
+  });
+  return { token: json.token, user: json.data };
+}
+
+/**
+ * POST /api/auth/google { credential } -> { token, user }
+ * credential is the Google ID token from the One Tap prompt. Links by
+ * verified email: password accounts gain Google sign-in, new emails get one.
+ */
+export async function googleLogin(credential) {
+  const json = await request('/auth/google', {
+    method: 'POST',
+    body: { credential },
   });
   return { token: json.token, user: json.data };
 }
