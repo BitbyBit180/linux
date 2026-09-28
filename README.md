@@ -122,7 +122,7 @@ production delivery refuses loudly instead of dropping the reset.
 | GET | `/api/flavours/categories` | `["All", ...]` |
 | GET | `/api/distros/:id` | by `distroId` or name — includes full `installGuide` (Detail page) |
 | GET | `/api/distros/compare?ids=a,b,c,d` | side-by-side spec comparison (max 4, ordered) |
-| POST | `/api/quiz/recommend` | Jev "Find Your Distro" pick (public; `{ answers[], shortlist[] }` → `{ ai, winner, runnersUp, probabilities, confidence, explanation, strengths, tip }` with rule-based fallback) |
+| POST | `/api/quiz/recommend` | Jev "Find Your Distro" pick (public; `{ answers[] }` → `{ ai, winner, runnersUp, probabilities, confidence, explanation, strengths, tip }`; fully AI, no scoring table) |
 | POST/PUT/DELETE | `/api/flavours...`, `/api/distros...` | admin CRUD per collection |
 
 ### Auth & AI chat (JWT-protected)

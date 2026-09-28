@@ -23,7 +23,7 @@ No tests, linter, typecheck, or CI exist. Verify with `vite build` (frontend) an
 - **No react-router.** Custom pushState router in `frontend/src/App.jsx`: adding a page means extending `normalizeRoute` (pathname + hash) AND the `isX` checks AND the render ternary. A route missing from `normalizeRoute` silently falls back to `/`.
 - **API access**: `import.meta.env.VITE_API_URL || '/api'`; dev proxies `/api` → `:5000` (`frontend/vite.config.js`). Every `frontend/src/services/*` module follows fetch-then-fallback-to-static-data — preserve that pattern so the UI never breaks offline.
 - **Two collections, one key**: `flavours` (lean cards) vs `distros` (full detail + guides), linked by `distroId`. Seed keeps them in sync.
-- **Quiz scoring lives in one place**: `frontend/src/utils/distroQuiz.js`. The backend quiz endpoint (`POST /api/quiz/recommend`) trusts the client's shortlist and only validates ids — do not duplicate the scoring table server-side.
+- **Quiz is fully AI**: `frontend/src/utils/distroQuiz.js` holds questions only (no scores). `POST /api/quiz/recommend` sends readable answers; Jev picks from the whole catalogue. No shortlist, no fallback ranking — AI failure is an error + retry.
 - **Groq via plain `fetch`** (`backend/src/services/groqClient.js`) — OpenAI-compatible, no SDK dependency. Model from `GROQ_MODEL`.
 - **Styling**: shared tokens in `frontend/src/theme/designTokens.js` (`THEME`, `MONO`, `LINE`); one burnt-orange accent, JetBrains Mono, inline-style components. Don't hardcode hexes.
 - **Data mirrors**: `frontend/src/data/distros.js` and `backend/src/data/distros.js` both hold the 14 seeded distros — keep them in sync when adding one.

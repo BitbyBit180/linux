@@ -39,7 +39,11 @@ import { AboutChannel } from '../components/community/CommunitySidebar.jsx';
 import { timeAgo } from '../utils/timeAgo.js';
 import {
   getPost,
+  peekPost,
+  peekStalePost,
   getChannelStats,
+  peekChannelStats,
+  peekStaleChannelStats,
   updatePost,
   deletePost,
   votePost,
@@ -474,9 +478,13 @@ export default function PostDetailPage({ postId, onNavigate }) {
     [distros]
   );
 
-  const [post, setPost] = useState(null);
-  const [comments, setComments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Instant paint on revisits AND reloads: init from the post cache (same
+  // 30s TTL as the service, stale entries included) so back-navigation
+  // skips the skeleton; load() revalidates.
+  const [initialPost] = useState(() => peekPost(postId) ?? peekStalePost(postId));
+  const [post, setPost] = useState(initialPost?.post || null);
+  const [comments, setComments] = useState(initialPost?.comments || []);
+  const [loading, setLoading] = useState(!initialPost);
   const [error, setError] = useState(null);
 
   const [editing, setEditing] = useState(false);
@@ -513,7 +521,15 @@ export default function PostDetailPage({ postId, onNavigate }) {
   /* ------------------------------- data loading ----------------------------- */
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // Revalidate silently when cached — no skeleton flash on revisits.
+    const cached = peekPost(postId) ?? peekStalePost(postId);
+    if (cached) {
+      setPost(cached.post);
+      setComments(cached.comments || []);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const data = await getPost(postId);
@@ -537,6 +553,8 @@ export default function PostDetailPage({ postId, onNavigate }) {
   // Channel stats for the "About this channel" rail card
   useEffect(() => {
     if (!post?.channel) return;
+    const cachedStats = peekChannelStats(post.channel) ?? peekStaleChannelStats(post.channel);
+    if (cachedStats) setChannelStats(cachedStats);
     let cancelled = false;
     getChannelStats(post.channel)
       .then((s) => !cancelled && setChannelStats(s))

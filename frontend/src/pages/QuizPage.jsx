@@ -12,15 +12,16 @@ import {
 import Navbar from '../components/Navbar.jsx';
 import { QuizResultSkeleton } from '../components/Skeleton.jsx';
 import { useDistros } from '../hooks/useDistros.js';
-import { QUIZ_QUESTIONS, scoreQuiz } from '../utils/distroQuiz.js';
+import { QUIZ_QUESTIONS } from '../utils/distroQuiz.js';
 import { getAiRecommendation } from '../services/quizApi.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
 
 /**
  * "Find Your Distro" — a short wizard with a single Jev-decided result.
- * The quiz waits for Jev's verdict before ranking anything, so the user
- * sees one decision instead of a rule-based flash followed by a re-rank.
- * If Jev is unreachable, the classic rule-based match stands.
+ * The recommendation is fully AI: answers go to POST /api/quiz/recommend
+ * and Jev picks from the whole catalogue. There is no scoring table —
+ * if Jev is unreachable the result is an error with a retry, never a
+ * hardcoded guess.
  */
 export default function QuizPage({ onNavigate }) {
   const { distros } = useDistros();
@@ -34,88 +35,80 @@ export default function QuizPage({ onNavigate }) {
 
   const total = QUIZ_QUESTIONS.length;
   const done = step >= total;
-  const ranked = useMemo(
-    () => (done ? scoreQuiz(answers).slice(0, 3) : []),
-    [done, answers]
-  );
 
-  // AI verdict (Jev): the quiz WAITS for this before ranking anything, so
-  // the user sees exactly one decision — no rule-based flash, no re-rank flip.
-  // 'idle' | 'deciding' | 'ready' | 'fallback' (fallback = classic match).
-  const [aiState, setAiState] = useState({ status: 'idle', verdict: null });
+  // AI verdict (Jev): the quiz WAITS for this before showing anything, so
+  // the user sees exactly one decision. 'idle' | 'deciding' | 'ready' | 'error'.
+  const [aiState, setAiState] = useState({ status: 'idle', verdict: null, message: null });
+  // Bumped by the error panel's retry button to re-run the effect below.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!done) return;
     let cancelled = false;
-    setAiState({ status: 'deciding', verdict: null });
+    setAiState({ status: 'deciding', verdict: null, message: null });
 
     const readable = QUIZ_QUESTIONS.map((q) => ({
       questionId: q.id,
       question: q.question,
       answer: q.options[answers[q.id]]?.label || 'Skipped',
     }));
-    const shortlist = scoreQuiz(answers)
-      .slice(0, 5)
-      .map((r) => ({ distroId: r.distroId, points: r.points, reasons: r.reasons }));
 
-    getAiRecommendation({ answers: readable, shortlist })
+    getAiRecommendation({ answers: readable })
       .then((json) => {
         if (cancelled) return;
         if (json?.ai && json?.winner) {
-          setAiState({ status: 'ready', verdict: json });
+          setAiState({ status: 'ready', verdict: json, message: null });
         } else {
-          setAiState({ status: 'fallback', verdict: json || null });
+          setAiState({
+            status: 'error',
+            verdict: null,
+            message: json?.message || 'The AI could not decide. Please try again.',
+          });
         }
       })
-      .catch(() => {
-        if (!cancelled) setAiState({ status: 'fallback', verdict: null });
+      .catch((err) => {
+        if (!cancelled) {
+          setAiState({
+            status: 'error',
+            verdict: null,
+            message: err?.message || 'Could not reach the AI. Please try again.',
+          });
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [done]);
+  }, [done, attempt]);
 
-  // Display order is set ONCE the verdict lands: Jev's winner + runners-up
-  // enriched with local points/percent/reasons, or the rule-based ranking
-  // when AI is unavailable. Nothing renders before that.
+  // Display order comes ONLY from the verdict: Jev's winner + runners-up,
+  // with match-% from Jev's probabilities (winner = 100, runners relative)
+  // and reason chips from the verdict's per-distro strengths. There is no
+  // local ranking — nothing renders before the verdict lands.
   const aiVerdict =
     aiState.status === 'ready' && aiState.verdict && distroMap[aiState.verdict.winner]
       ? aiState.verdict
       : null;
-  const decided = aiState.status === 'ready' || aiState.status === 'fallback';
+  const decided = aiState.status === 'ready';
   const displayRanked = useMemo(() => {
-    if (!done || !decided) return [];
-    if (aiVerdict) {
-      const order = [aiVerdict.winner, ...(aiVerdict.runnersUp || [])].filter(Boolean);
-      const base = new Map(scoreQuiz(answers).map((r) => [r.distroId, r]));
-      // Match-% comes from Jev's probabilities (winner = 100, runners
-      // relative) so the numbers agree with the order shown. Falls back to
-      // points when probabilities are absent.
-      const probs = aiVerdict.probabilities || {};
-      const topP = Math.max(0, ...order.map((id) => Number(probs[id]) || 0));
-      return order.map((id, i) => {
-        const hit = base.get(id);
-        const entry = hit || {
-          distroId: id,
-          points: 0,
-          reasons: [],
-        };
-        const percent =
-          topP > 0 && probs[id] != null
-            ? i === 0
-              ? 100
-              : Math.max(5, Math.round(((Number(probs[id]) || 0) / topP) * 100))
-            : hit
-              ? hit.percent
-              : i === 0
-                ? 100
-                : Math.max(40, 85 - i * 10);
-        return { ...entry, percent };
-      });
-    }
-    return ranked;
-  }, [done, decided, aiVerdict, answers, ranked]);
+    if (!done || !aiVerdict) return [];
+    const order = [aiVerdict.winner, ...(aiVerdict.runnersUp || [])].filter(Boolean);
+    const probs = aiVerdict.probabilities || {};
+    const strengths = aiVerdict.strengths || {};
+    const topP = Math.max(0, ...order.map((id) => Number(probs[id]) || 0));
+    return order.map((id, i) => ({
+      distroId: id,
+      percent:
+        topP > 0 && probs[id] != null
+          ? i === 0
+            ? 100
+            : Math.max(5, Math.round(((Number(probs[id]) || 0) / topP) * 100))
+          : i === 0
+            ? 100
+            : Math.max(40, 85 - i * 10),
+      reasons: strengths[id] ? [strengths[id]] : [],
+    }));
+  }, [done, aiVerdict]);
   const topDistro = displayRanked[0] ? distroMap[displayRanked[0].distroId] : null;
 
   const choose = (optIndex) => {
@@ -127,7 +120,12 @@ export default function QuizPage({ onNavigate }) {
   const reset = () => {
     setAnswers({});
     setStep(0);
-    setAiState({ status: 'idle', verdict: null });
+    setAttempt(0);
+    setAiState({ status: 'idle', verdict: null, message: null });
+  };
+
+  const retryAi = () => {
+    setAttempt((a) => a + 1);
   };
 
   return (
@@ -188,11 +186,11 @@ export default function QuizPage({ onNavigate }) {
             }}
           >
             {done
-              ? !decided
-                ? 'Jev is weighing your answers to pick your best match…'
-                : aiVerdict
-                  ? `Jev picked your match${typeof aiVerdict.confidence === 'number' ? ` · ${Math.round(aiVerdict.confidence * 100)}% confidence` : ''}.`
-                  : 'Based on your answers, here are your best matches.'
+              ? aiVerdict
+                ? `Jev picked your match${typeof aiVerdict.confidence === 'number' ? ` · ${Math.round(aiVerdict.confidence * 100)}% confidence` : ''}.`
+                : aiState.status === 'error'
+                  ? 'The AI could not decide — check the message below.'
+                  : 'Jev is weighing your answers to pick your best match…'
               : `Answer ${total} quick questions and we'll match you with the right Linux distro.`}
           </p>
         </div>
@@ -200,10 +198,87 @@ export default function QuizPage({ onNavigate }) {
         {!done ? (
           /* ------------------------------ wizard ------------------------------ (see below) */
           null
+        ) : aiState.status === 'error' ? (
+          /* ------------------------- AI-unavailable error ------------------------- */
+          /* Fully AI means no hardcoded fallback: a failed verdict is an
+             error with a retry that keeps the answers. */
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center"
+            style={{
+              borderRadius: 20,
+              padding: '36px 24px',
+              border: `1px solid ${LINE}`,
+              background: 'rgba(28, 34, 41, 0.55)',
+            }}
+          >
+            <p
+              style={{
+                fontFamily: MONO,
+                fontSize: '0.86rem',
+                fontWeight: 700,
+                color: THEME.textMain,
+                margin: '0 0 8px',
+              }}
+            >
+              Jev couldn&apos;t decide right now
+            </p>
+            <p
+              style={{
+                fontFamily: MONO,
+                fontSize: '0.74rem',
+                color: THEME.textMuted,
+                margin: '0 0 20px',
+                lineHeight: 1.6,
+              }}
+            >
+              {aiState.message || 'The AI recommendation is unavailable. Please try again.'}
+            </p>
+            <div className="flex items-center justify-center" style={{ gap: 10 }}>
+              <button
+                type="button"
+                onClick={retryAi}
+                className="inline-flex items-center transition-all"
+                style={{
+                  gap: 7,
+                  fontFamily: MONO,
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#fff',
+                  background: `linear-gradient(135deg, ${THEME.accent} 0%, #b83d25 100%)`,
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 9999,
+                  padding: '10px 20px',
+                  cursor: 'pointer',
+                  boxShadow: `0 2px 16px ${THEME.accent}55`,
+                }}
+              >
+                <RotateCcw size={14} />
+                Try again
+              </button>
+              <button
+                type="button"
+                onClick={reset}
+                className="transition-colors"
+                style={{
+                  fontFamily: MONO,
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: THEME.textMuted,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Retake quiz
+              </button>
+            </div>
+          </motion.div>
         ) : !decided ? (
           /* ------------------------- deciding loader ------------------------- */
-          /* One decision, rendered once: the ranking appears only after Jev
-             answers, so there is no rule-based flash followed by a re-rank. */
+          /* One decision, rendered once: the result appears only after Jev
+             answers, so the user never sees a guessed ranking first. */
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -585,19 +660,6 @@ export default function QuizPage({ onNavigate }) {
                 Retake quiz
               </button>
             </div>
-            {aiState.status === 'fallback' ? (
-              <p
-                className="text-center"
-                style={{
-                  fontFamily: MONO,
-                  fontSize: '0.66rem',
-                  color: THEME.textMuted,
-                  margin: '14px 0 0',
-                }}
-              >
-                Showing the classic match — Jev is unreachable right now.
-              </p>
-            ) : null}
           </motion.div>
         )}
         {!done && (

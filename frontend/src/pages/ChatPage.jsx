@@ -34,6 +34,7 @@ import {
   sendMessage,
   sendMessageStream,
   peekChatList,
+  peekStaleChatList,
 } from '../services/chatApi.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
 import { ChatListSkeleton, ChatMessagesSkeleton } from '../components/Skeleton.jsx';
@@ -1245,9 +1246,10 @@ export default function ChatPage({ onNavigate }) {
   const isMobile = useMedia('(max-width: 767px)');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  // Instant sidebar on revisits: init from the chat-list cache so switching
-  // back skips the skeleton; refreshChats revalidates silently.
-  const [initialChats] = useState(() => peekChatList());
+  // Instant sidebar on revisits AND reloads: init from the chat-list cache
+  // (stale entries included) so switching back skips the skeleton;
+  // refreshChats revalidates silently.
+  const [initialChats] = useState(() => peekChatList() ?? peekStaleChatList());
   const [chats, setChats] = useState(initialChats || []);
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);

@@ -14,7 +14,7 @@ import { MobileChannelBar } from '../components/community/CommunityNav.jsx';
 import {
   RecentPosts,
 } from '../components/community/CommunitySidebar.jsx';
-import { listPosts, createPost, votePost, suggestChannel, peekPosts } from '../services/communityApi.js';
+import { listPosts, createPost, votePost, suggestChannel, peekPosts, peekStalePosts } from '../services/communityApi.js';
 
 /* --------------------------------- tokens --------------------------------- */
 
@@ -340,10 +340,13 @@ export default function CommunityPage({ onNavigate }) {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState(''); // applied after debounce
 
-  // Instant first paint on revisits: init from the feed cache (default
-  // filters) so switching back skips the skeleton; fetchPage revalidates.
-  const [initialFeed] = useState(() =>
-    peekPosts({ channel: 'all', sort: 'hot', search: '', page: 1, limit: PAGE_SIZE })
+  // Instant first paint on revisits AND reloads: init from the feed cache
+  // (default filters) so switching back skips the skeleton; fetchPage
+  // revalidates. Stale entries still paint instantly, then refresh.
+  const [initialFeed] = useState(
+    () =>
+      peekPosts({ channel: 'all', sort: 'hot', search: '', page: 1, limit: PAGE_SIZE }) ??
+      peekStalePosts({ channel: 'all', sort: 'hot', search: '', page: 1, limit: PAGE_SIZE })
   );
   const [posts, setPosts] = useState(initialFeed?.posts || []);
   const [page, setPage] = useState(initialFeed?.page || 1);

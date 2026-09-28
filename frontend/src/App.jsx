@@ -1,17 +1,111 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { PageSkeleton } from './components/Skeleton.jsx';
 
+// Chunk-load failures (stale deploy with hashed filenames, flaky network)
+// reject the lazy() import and — with no boundary — leave a blank page that
+// only a refresh fixes. lazyWithRetry reloads once to grab fresh chunks;
+// RouteErrorBoundary below catches anything left and offers a manual reload.
+const CHUNK_RETRY_KEY = 'dp_chunk_retried';
+
+function lazyWithRetry(importer) {
+  return lazy(async () => {
+    try {
+      return await importer();
+    } catch (err) {
+      if (!sessionStorage.getItem(CHUNK_RETRY_KEY)) {
+        sessionStorage.setItem(CHUNK_RETRY_KEY, '1');
+        window.location.reload();
+        return new Promise(() => {}); // never resolves; reload takes over
+      }
+      throw err;
+    }
+  });
+}
+
+class RouteErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div
+          style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#161B22',
+            padding: 24,
+          }}
+        >
+          <div style={{ textAlign: 'center', maxWidth: 420 }}>
+            <p
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '1rem',
+                fontWeight: 800,
+                color: '#F0F4F8',
+                margin: '0 0 8px',
+              }}
+            >
+              This page failed to load
+            </p>
+            <p
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '0.76rem',
+                color: '#8B949E',
+                margin: '0 0 20px',
+                lineHeight: 1.6,
+              }}
+            >
+              Usually a stale update or a broken connection. Reloading fixes it.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                sessionStorage.removeItem(CHUNK_RETRY_KEY);
+                window.location.reload();
+              }}
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: '#fff',
+                background: 'linear-gradient(135deg, #E05A38 0%, #b83d25 100%)',
+                border: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: 9999,
+                padding: '10px 24px',
+                cursor: 'pointer',
+              }}
+            >
+              Reload page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Route-split: each page loads on demand so the initial bundle stays small.
 // (Vite emits one chunk per page; see the build output.)
-const HomePage = lazy(() => import('./pages/HomePage.jsx'));
-const FlavoursPage = lazy(() => import('./pages/FlavoursPage.jsx'));
-const DistroDetailPage = lazy(() => import('./pages/DistroDetailPage.jsx'));
-const ComparePage = lazy(() => import('./pages/ComparePage.jsx'));
-const AuthPage = lazy(() => import('./pages/AuthPage.jsx'));
-const ChatPage = lazy(() => import('./pages/ChatPage.jsx'));
-const CommunityPage = lazy(() => import('./pages/CommunityPage.jsx'));
-const PostDetailPage = lazy(() => import('./pages/PostDetailPage.jsx'));
-const QuizPage = lazy(() => import('./pages/QuizPage.jsx'));
+// lazyWithRetry: a failed chunk load reloads once instead of blank-screening.
+const HomePage = lazyWithRetry(() => import('./pages/HomePage.jsx'));
+const FlavoursPage = lazyWithRetry(() => import('./pages/FlavoursPage.jsx'));
+const DistroDetailPage = lazyWithRetry(() => import('./pages/DistroDetailPage.jsx'));
+const ComparePage = lazyWithRetry(() => import('./pages/ComparePage.jsx'));
+const AuthPage = lazyWithRetry(() => import('./pages/AuthPage.jsx'));
+const ChatPage = lazyWithRetry(() => import('./pages/ChatPage.jsx'));
+const CommunityPage = lazyWithRetry(() => import('./pages/CommunityPage.jsx'));
+const PostDetailPage = lazyWithRetry(() => import('./pages/PostDetailPage.jsx'));
+const QuizPage = lazyWithRetry(() => import('./pages/QuizPage.jsx'));
 
 function normalizeRoute(pathname, hash) {
   const path = (pathname || '').toLowerCase();
@@ -69,6 +163,12 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // A route that rendered fine clears the chunk-retry flag, so the next
+  // real chunk failure gets its one automatic reload again.
+  useEffect(() => {
+    sessionStorage.removeItem(CHUNK_RETRY_KEY);
+  }, [currentRoute]);
+
   const navigate = (path) => {
     if (window.location.pathname !== path) {
       window.history.pushState({}, '', path);
@@ -92,6 +192,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-transparent text-[#F0F4F8]">
+      {/* key remounts the boundary per route: a failed page shows the
+          reload card, and navigating away gives the next page a clean try. */}
+      <RouteErrorBoundary key={currentRoute}>
       <Suspense fallback={<PageSkeleton />}>
       {isDistroDetail ? (
         <DistroDetailPage distroId={distroId} onNavigate={navigate} />
@@ -113,6 +216,7 @@ export default function App() {
         <HomePage onNavigate={navigate} />
       )}
       </Suspense>
+      </RouteErrorBoundary>
     </div>
   );
 }

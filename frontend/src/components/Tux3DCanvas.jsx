@@ -3,6 +3,30 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+// Module-level cache: the parsed Tux scene survives remounts (Home
+// unmounts on every navigation). Revisits clone the cached scene — shared
+// geometries/materials, near-free — instead of re-fetching + re-parsing
+// scene.gltf. The pristine scene is cached; each mount clones it BEFORE
+// applying scale/position so transforms never stack.
+let cachedTuxScene = null;
+let tuxLoadPromise = null;
+
+function loadTuxScene() {
+  if (cachedTuxScene) return Promise.resolve(cachedTuxScene);
+  if (!tuxLoadPromise) {
+    tuxLoadPromise = new Promise((resolve, reject) => {
+      new GLTFLoader().load('/tux/scene.gltf', (gltf) => {
+        cachedTuxScene = gltf.scene;
+        resolve(cachedTuxScene);
+      }, undefined, reject);
+    }).catch((err) => {
+      tuxLoadPromise = null; // allow a later revisit to retry
+      throw err;
+    });
+  }
+  return tuxLoadPromise;
+}
+
 /**
  * Interactive 3D Tux Canvas using Three.js
  *
@@ -189,12 +213,14 @@ export default function Tux3DCanvas({
       scene.add(pivotGroup);
       pivotGroupRef.current = pivotGroup;
 
-      // GLTF Loader for Tux
-      const loader = new GLTFLoader();
-      loader.load(
-        '/tux/scene.gltf',
-        (gltf) => {
-          const model = gltf.scene;
+      // GLTF Tux — parsed scene cached at module level across remounts.
+      // `cancelled` guards the async load: unmounting mid-load must not
+      // touch the torn-down scene or set state.
+      let cancelled = false;
+      loadTuxScene().then(
+        (base) => {
+          if (cancelled) return;
+          const model = base.clone();
 
           // Compute exact bounding box to center & auto-scale model perfectly
           const bbox = new THREE.Box3().setFromObject(model);
@@ -224,12 +250,12 @@ export default function Tux3DCanvas({
           pivotGroup.add(model);
           setIsLoading(false);
         },
-        undefined,
         (err) => {
+          if (cancelled) return;
           console.error('Failed to load Tux 3D model:', err);
           setLoadError(true);
           setIsLoading(false);
-        },
+        }
       );
 
       // Resize observer
@@ -311,6 +337,7 @@ export default function Tux3DCanvas({
       animate();
 
       return () => {
+        cancelled = true;
         if (animFrameId) cancelAnimationFrame(animFrameId);
         window.removeEventListener('resize', handleResize);
         controls.dispose();

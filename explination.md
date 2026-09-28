@@ -10,7 +10,7 @@
 - Browse **14 Linux distros** (Ubuntu, Debian, Arch, Fedora, Mint, Kali, etc.) as visual cards
 - Open a **detail page** per distro: specs, features, install guide (Normal / Dual-boot / VM)
 - **Compare up to 4 distros** side-by-side in a spec table
-- **Quiz — "Find Your Distro"**: 10 questions → rule-based scoring + AI verdict (TypeSafe Jev)
+- **Quiz — "Find Your Distro"**: 10 questions → fully-AI verdict (TypeSafe Jev picks from the whole catalogue)
 - **AI Chat — DistroPedia AI**: login-protected assistant using Groq + Reddit + web research
 - **Community**: Reddit-style forum with per-distro channels, posts, threaded comments, votes, reports, notifications, admin moderation
 
@@ -104,7 +104,7 @@ npm run dev            # frontend → http://localhost:5173
 
 | File | Explanation |
 |---|---|
-| `src/utils/distroQuiz.js` | **Quiz scoring source of truth.** Exports `QUIZ_QUESTIONS` (10 questions) + `scoreQuiz(answers)` → ranked `[{distroId, points, percent, reasons}]`. Used by `QuizPage`. Backend trusts this shortlist. |
+| `src/utils/distroQuiz.js` | Questions only (no scores). Exports `QUIZ_QUESTIONS` (10 questions, bare labels). Jev picks the winner from the full catalogue. |
 | `src/utils/timeAgo.js` | Exports `timeAgo(date)` → `just now / 5m / 3h / 2d / Jan 5`. Used by community feed/comments/notifications. |
 
 ### 3.6 `src/services/` — all use `VITE_API_URL || /api`, all fetch-then-fallback
@@ -115,7 +115,7 @@ npm run dev            # frontend → http://localhost:5173
 | `src/services/authApi.js` | Auth + `localStorage dp_token/dp_user`. `getToken/getUser/setAuth/clearAuth/register/login/me/forgotPassword/resetPassword/verifyResetToken`. |
 | `src/services/chatApi.js` | Protected chat CRUD: `listChats/createChat/getChat/renameChat/deleteChat/sendMessage`. Used by `ChatPage`. |
 | `src/services/communityApi.js` | Protected forum: posts CRUD + votes, comments CRUD + votes, `getChannelStats, suggestChannel, createReport, getNotifications/markRead/markAllRead`. |
-| `src/services/quizApi.js` | `getAiRecommendation({answers, shortlist})` → `POST /quiz/recommend` (30s abort). Throws on failure → triggers rule-based fallback. |
+| `src/services/quizApi.js` | `getAiRecommendation({answers})` → `POST /quiz/recommend` (30s abort, 10-min verdict cache). Throws on failure → error panel with retry. |
 
 ### 3.7 `src/hooks/`
 
@@ -161,7 +161,7 @@ npm run dev            # frontend → http://localhost:5173
 | `src/pages/FlavoursPage.jsx` → `/flavours` | Catalogue with search + category pills, Popular + All grids, quiz CTA. Uses `useDistros/DistroCard/Navbar`. |
 | `src/pages/DistroDetailPage.jsx` → `/distro/:id` | Full-bleed banner, spec matrix, tabbed install guide (`normal/dual/vm`) with copyable commands + lightbox, side-dock scrollspy. Uses `useDistro/getInstallationData`. |
 | `src/pages/ComparePage.jsx` → `/compare?ids=` | Picker (max 4) + spec table (`COMPARE_ROWS`). Uses `useDistros/useCompare`. |
-| `src/pages/QuizPage.jsx` → `/quiz` | 10-step wizard → waits for Jev verdict (`quizApi`) → winner + runners-up + compare/community actions. Falls back to `scoreQuiz`. |
+| `src/pages/QuizPage.jsx` → `/quiz` | 10-step wizard → waits for Jev verdict (`quizApi`) → winner + runners-up + compare/community actions. AI failure shows an error panel with retry (no hardcoded guess). |
 | `src/pages/AuthPage.jsx` → `/login` | Login/register + forgot → 6-box OTP → reset. Exports `AuthPage + OtpInput/ForgotResetView`. Uses `useAuth/authApi`. |
 | `src/pages/ChatPage.jsx` → `/chat` | DistroPedia AI: sidebar history (rename/delete/collapse/drawer), markdown + `CodeBlock/TableBlock`, typewriter reveal, copy/download `.md`. Guards to `AuthPage` when no token. |
 | `src/pages/CommunityPage.jsx` → `/community` | Feed with channel/sort/debounced search, `Composer` + AI `suggestChannel`, optimistic voting, pagination. |
@@ -214,7 +214,7 @@ Two collections, one key: `flavours` (cards) vs `distros` (detail+guides), linke
 | `src/controllers/authController.js` | `register\|login (bcrypt+jwt 7d), getMe, forgotPassword\|verifyResetToken\|resetPassword` (6-digit OTP, sha256 + 15m expiry, `deliverResetToken`). |
 | `src/controllers/chatController.js` | `getChats, create\|get\|rename\|deleteChat (ownership→404), sendMessage` pipeline: save user msg → parallel `searchReddit + runWebResearch` → `synthesizeAnswer` → `filterSources` → save assistant msg. |
 | `src/controllers/communityController.js` | Full Reddit-clone: `listPosts(?channel,sort:hot\|new\|top,search,page)` (hotScore aggregation), post CRUD (delete cascades), comment CRUD (recursive delete), votes, `getChannelStats, suggestChannelForDraft, create\|list\|updateReportStatus, notifications, getAuditLog`. Calls `Vote, moderationAgent, channelSuggestAgent, auditLog`. |
-| `src/controllers/quizController.js` | `POST {answers[], shortlist[]}` public, always 200: `loadCatalogue (DB→static fallback), sanitizeOrder, fallback({ai:false})` if no key/error/low confidence, else `recommendDistro()` → `{ai:true, winner, runnersUp, probabilities, confidence, explanation, strengths, tip}`. |
+| `src/controllers/quizController.js` | `POST {answers[]}` public, always 200: `loadCatalogue (DB→static fallback), sanitizeOrder`, `fallback({ai:false, winner:null})` on no key/error/low confidence, else `recommendDistro()` → `{ai:true, winner, runnersUp, probabilities, confidence, explanation, strengths, tip}`. Fully AI — no scoring. |
 
 ### 4.5 `src/routes/` — mounted in `server.js`
 
@@ -245,7 +245,7 @@ Two collections, one key: `flavours` (cards) vs `distros` (detail+guides), linke
 | `src/services/webResearchAgent.js` | `runWebResearch({question, history})` — Groq recall (temp 0.3), empty on fail. Runs parallel with Reddit. |
 | `src/services/synthesizerAgent.js` | `synthesizeAnswer({question, history, redditResults, webFindings, webSources})` — final Markdown + Sources section. |
 | `src/services/citationAgent.js` | `filterSources({question, sources})` — Jev Noul per source, keep ≥0.3, never strip all. |
-| `src/services/quizAgent.js` | `recommendDistro({answers, shortlist, catalogue})` — one Jev Choice + code-derived `runnersUp, explanation, strengths, tip`. `MIN_TOP_PROBABILITY=0.15`. |
+| `src/services/quizAgent.js` | `recommendDistro({answers, catalogue})` — one Jev Choice over the full catalogue + code-derived `runnersUp, explanation, strengths, tip`. `MIN_TOP_PROBABILITY=0.15`. |
 | `src/services/moderationAgent.js` | `screenContent({targetType, targetId, title, body})` — fire-and-forget Jev 3×Noul (spam/abusive/offtopic, threshold 0.7) → `Report(source:ai)`. |
 | `src/services/channelSuggestAgent.js` | `suggestChannel({title, body})` — Jev Choice over `general + distroIds`. |
 
@@ -276,7 +276,7 @@ GET  /api/flavours/popular
 GET  /api/flavours/categories
 GET  /api/distros/:id              (by distroId or name, includes installGuide)
 GET  /api/distros/compare?ids=a,b,c,d
-POST /api/quiz/recommend           { answers[], shortlist[] }
+POST /api/quiz/recommend           { answers[] } → fully-AI verdict
 POST /api/auth/register|login      → { token, user }
 GET  /api/auth/me                  (Bearer)
 GET|POST /api/chat                 (Bearer)
@@ -293,7 +293,7 @@ Graceful degradation: quiz returns `{ai:false}` without `TYPESAFE_API_KEY`; chat
 
 1. **Hook (30s):** "Choosing a Linux distro is overwhelming — DistroPedia is an interactive guide: browse, compare, quiz, ask AI, discuss."
 2. **Browse (1m):** Home orbital hero (Three.js Tux) → Flavours grid + search/filter → Detail page specs + install-guide tabs with images + copyable commands.
-3. **Decide (1m):** Compare 4 distros side-by-side → Quiz wizard → show rule-based score + Jev AI verdict with probabilities.
+3. **Decide (1m):** Compare 4 distros side-by-side → Quiz wizard → show Jev AI verdict with probabilities.
 4. **Ask + Discuss (1m):** Login → AI chat (Reddit + Groq synthesis with sources) → Community post/vote/comment per distro channel.
 5. **Under the hood (1m):** MERN diagram, two-collections-one-key (`flavours` vs `distros` via `distroId`), custom router, fetch-then-fallback, plain-fetch AI clients, JWT + rate limits + moderation pipeline. Close with `npm run seed / server / dev`.
 
@@ -432,47 +432,32 @@ await Flavour.insertMany(detailDocs.map(toFlavourDoc)); // lean subset only
 
 **Explain:** `npm run seed` wipes both collections, inserts 14 full docs into `distros`, projects lean fields into `flavours`. One key links them: `distroId`. `frontend/src/data/distros.js` and `backend/src/data/distros.js` must stay in sync.
 
-## B6. Quiz end-to-end — code for scoring + AI verdict
+## B6. Quiz end-to-end — fully AI, no scoring table
 
-**Chain:** `utils/distroQuiz.js:253-279` → `pages/QuizPage.jsx:47-77` → `services/quizApi.js:10-28` → `controllers/quizController.js:58-128` → `services/quizAgent.js:59-90` → `services/jevClient.js:12-50`
+**Chain:** `utils/distroQuiz.js` (questions only) → `pages/QuizPage.jsx` → `services/quizApi.js` → `controllers/quizController.js` → `services/quizAgent.js:59` → `services/jevClient.js:12`
 
 ```js
-// 1. Rule-based scoring (frontend source of truth, Kali trap = 25 pts)
-export function scoreQuiz(answers) {
-  const tally = new Map();
-  for (const q of QUIZ_QUESTIONS) {
-    const option = q.options[answers[q.id]];
-    for (const [distroId, pts] of Object.entries(option.scores)) {
-      const e = tally.get(distroId) || { points:0, reasons:new Set() };
-      e.points += pts; e.reasons.add(option.reason); tally.set(distroId, e);
-    }
-  }
-  return [...tally.entries()].map(...).sort((a,b)=>b.points-a.points);
-}
+// 1. Questions only — options are bare labels, zero points anywhere
+export const QUIZ_QUESTIONS = [{ id: 'experience', question: '...', options: [{ label: '...' }] }, ...];
 
-// 2. QuizPage waits for AI — no flash, one decision
-const shortlist = scoreQuiz(answers).slice(0,5)
-  .map(r => ({ distroId:r.distroId, points:r.points, reasons:r.reasons }));
-getAiRecommendation({ answers: readable, shortlist })
-  .then(json => json?.ai ? setAiState({status:'ready',verdict:json})
-                         : setAiState({status:'fallback'}));
+// 2. QuizPage sends readable answers only — no shortlist is computed
+const readable = QUIZ_QUESTIONS.map((q) => ({ questionId: q.id, question: q.question, answer: ... }));
+getAiRecommendation({ answers: readable })  // throws → error panel + retry (keeps answers)
 
-// 3. quizApi — throws so caller falls back
-await fetch(`${API_BASE}/quiz/recommend`, { method:'POST', body:JSON.stringify({answers,shortlist}) });
+// 3. quizController — always 200, ai:false means error (never a guess)
+if (!process.env.TYPESAFE_API_KEY) return fallback(NO_KEY_MESSAGE);
+verdict = await recommendDistro({ answers, catalogue });
+if (topProbability < 0.15) return fallback('AI was unsure'); // uniform = noise
 
-// 4. quizController — always 200, ai:false on degradation
-if (!process.env.TYPESAFE_API_KEY) return fallback(NO_KEY_MESSAGE); // graceful
-verdict = await recommendDistro({ answers, shortlist, catalogue });
-if (topProbability < 0.15) return fallback('AI was unsure'); // near-uniform = noise
-
-// 5. quizAgent — ONE Jev Choice, rest is code
-const data = await systemOne({ state:{ answers, shortlist_hint: shortlist },
+// 4. quizAgent — ONE Jev Choice over the whole 14-distro catalogue
+const data = await systemOne({ state:{ answers },
   questions:{ best_distro:{ type:'choice', instructions:{...rubric}, criteria } } });
 // criteria = { ubuntu:"Ubuntu — ... | category | desktop | release | min RAM", ... }
-// runners-up = 2nd/3rd probability, explanation/tip built in code (FIRST_STEP_TIPS)
+// runners-up = 2nd/3rd probability; strengths = catalogue taglines;
+// explanation = user profile + winner tagline; tip = FIRST_STEP_TIPS[winner]
 ```
 
-**Explain:** Scoring never duplicated server-side — backend trusts client's shortlist, validates ids via `sanitizeOrder`, asks Jev for one winner choice. If key missing / error / low confidence → `{ai:false}` → frontend shows classic match.
+**Explain:** No scoring table exists anywhere. Backend validates Jev's pick against the catalogue via `sanitizeOrder`. Key missing / error / low confidence → `{ai:false, winner:null}` → frontend shows an error panel with Try again (answers kept) and Retake.
 
 ## B7. Auth — code for login/JWT/protect
 
@@ -567,8 +552,8 @@ coloredLayerRef.current.animate(
 | What if API is down? | Every service try/catch → static `data/distros.js` | `services/distroApi.js:37` |
 | Why two collections? | `flavours` lean cards vs `distros` full detail, linked by `distroId` | `backend/src/utils/seed.js:42` |
 | Why `initSystem` not `init`? | `init` is a reserved Mongoose method; mapped in `toJSON`/`toDB` | `models/Distro.js:26`, `controllers/distroController.js:8` |
-| Where is quiz scoring? | Only frontend `scoreQuiz`; backend trusts shortlist, only validates ids | `utils/distroQuiz.js:253`, `controllers/quizController.js:40` |
-| How does quiz AI work? | One Jev Choice over catalogue; code derives runners/explanation/tip | `services/quizAgent.js:70` |
+| Where is quiz scoring? | Nowhere — questions only in frontend, Jev Choice over full catalogue, failure = error + retry | `utils/distroQuiz.js`, `services/quizAgent.js:59` |
+| How does quiz AI work? | One Jev Choice over all 14; code derives runners/strengths/explanation from probabilities + catalogue | `services/quizAgent.js:70` |
 | How does chat AI work? | Parallel Reddit + Groq research → Groq synthesis → Jev citation filter | `controllers/chatController.js:101` |
 | How is auth done? | bcrypt + JWT 7d, Bearer in `protect`, `dp_token` in localStorage | `controllers/authController.js:10`, `middleware/authMiddleware.js:6` |
 | How is spam handled? | Rate limits + Jev moderation → `reports` + admin audit log | `middleware/rateLimit.js`, `services/moderationAgent.js` |

@@ -1,36 +1,32 @@
-# Feature: Find Your Distro Quiz + AI Verdict
+# Feature: Find Your Distro Quiz (fully AI)
 
-**What:** 10-question wizard → rule-based score → Jev (TypeSafe System One) picks winner + runners-up + explanation + first-step tip. Falls back to classic match if AI unreachable.
-**Route:** `/quiz`. **API:** `POST /api/quiz/recommend { answers[], shortlist[] }` (public, always 200).
+**What:** 10-question wizard → Jev (TypeSafe System One) picks winner + runners-up + explanation + first-step tip from the **whole catalogue**. No scoring table anywhere — a failed verdict is an error with retry, never a hardcoded guess.
+**Route:** `/quiz`. **API:** `POST /api/quiz/recommend { answers[] }` (public, always 200).
 
 ## User flow
 1. Answer 10 questions (experience, use, hardware, updates, desktop, effort, terminal, software, support, priority).
-2. Screen shows "Jev is weighing your answers…" (`QuizResultSkeleton`) — waits, no flash.
+2. Screen shows "Jev is weighing your answers…" (`QuizResultSkeleton`) — waits, renders exactly one decision.
 3. Result: winner card (100%) + 2 runners-up (%) + AI explanation + "First step" tip + buttons: View details / Compare top 3 / Join channel / Retake.
+4. If Jev is unreachable/unsure: error panel ("Jev couldn't decide right now") with **Try again** (keeps answers) and **Retake quiz**. Identical answers hit a 10-min client cache, so retry/back-nav skips the round-trip.
 
 ## Code chain
 ```
-utils/distroQuiz.js:253  scoreQuiz(answers) → ranked [{distroId,points,percent,reasons}]
-  → pages/QuizPage.jsx:47  builds readable Q&A + shortlist top-5 → quizApi
-  → services/quizApi.js:10  POST /quiz/recommend (30s abort, throws → fallback)
-  → controllers/quizController.js:58  loadCatalogue (DB→static), sanitizeOrder, fallback({ai:false})
-  → services/quizAgent.js:59  ONE Jev Choice over catalogue; code derives rest
-  → services/jevClient.js:12  plain fetch to api.typesafe.ai, typed judgments only
+utils/distroQuiz.js: QUIZ_QUESTIONS (questions + labels ONLY, no scores)
+  → pages/QuizPage.jsx: builds readable [{questionId, question, answer}]
+  → services/quizApi.js: POST /quiz/recommend (30s abort, throws → error panel)
+  → controllers/quizController.js: loadCatalogue (DB→static), ai:false when
+      no key / Jev error / top-probability < 0.15 (near-uniform = noise)
+  → services/quizAgent.js: ONE Jev Choice over all 14 catalogue options;
+      runners = 2nd/3rd probability; strengths = catalogue taglines;
+      explanation = user profile + winner tagline; tip = FIRST_STEP_TIPS
+  → services/jevClient.js: plain fetch to api.typesafe.ai, typed judgments only
 ```
 
 Key snippets:
 ```js
-// distroQuiz.js — scoring source of truth (Kali trap = 25 pts for security)
-scores: { kali: 25 }  // security-use option instantly wins
-
-// quizAgent.js — options ARE the catalogue
+// quizAgent.js — options ARE the catalogue, no shortlist hint
 criteria[d.id] = `${d.name} — ${d.tagline} | category | desktop | release | min RAM`;
-// runners-up = 2nd/3rd probability BUT must be in rule-based shortlist
-// explanation/tip built in code: buildExplanation() + FIRST_STEP_TIPS[winner]
-
-// quizController.js — guards
-if (!TYPESAFE_API_KEY) return fallback(...);          // graceful, no spend
-if (topProbability < 0.15) return fallback('AI unsure'); // uniform = noise
+// runners-up = full distribution order (not restricted to any shortlist)
 ```
 
 ## Files involved
@@ -38,4 +34,4 @@ if (topProbability < 0.15) return fallback('AI unsure'); // uniform = noise
 - Backend: `src/routes/quizRoutes.js` (rate-limited `quizLimiter` 20/m), `src/controllers/quizController.js`, `src/services/quizAgent.js`, `src/services/jevClient.js`, `src/data/distros.js` (catalogue fallback).
 
 ## How to demo / viva line
-"Scoring lives only in frontend; backend trusts the shortlist, validates ids, asks Jev for one Choice. Without a key it returns `ai:false` and the classic order stands." Open `frontend/src/utils/distroQuiz.js:253` and `backend/src/services/quizAgent.js:70`.
+"There is no scoring — Jev reads the answers and chooses from all 14 distros in one Choice judgment; percents are its probabilities, strengths are catalogue taglines." Open `frontend/src/utils/distroQuiz.js` (no scores) and `backend/src/services/quizAgent.js:59`.

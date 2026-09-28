@@ -55,7 +55,7 @@ Two collections, linked by `distroId`:
 | GET | `/api/flavours/categories` | `["All", ...]` |
 | GET | `/api/flavours/:id` | One catalogue card by `distroId` or name |
 | GET | `/api/distros/:id` | Full detail by `distroId` or name — includes `installGuide` (`normal`/`dual`/`vm`) |
-| POST | `/api/quiz/recommend` | AI "Find Your Distro" pick (public; `{ answers[], shortlist[] }` → `{ ai, winner, runnersUp, explanation, strengths, tip }`, rule-based fallback) |
+| POST | `/api/quiz/recommend` | AI "Find Your Distro" pick (public; `{ answers[] }` → `{ ai, winner, runnersUp, explanation, strengths, tip }`; fully AI, no scoring table) |
 | POST | `/api/flavours` | Create catalogue card |
 | PUT/DELETE | `/api/flavours/:id` | Update / delete catalogue card |
 | POST | `/api/distros` | Create detail (accepts frontend-shaped `id`/`init`/`installGuide`) |

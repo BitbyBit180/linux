@@ -2,7 +2,7 @@
 // All endpoints are protected: every request carries the Bearer token
 // from authApi (localStorage 'dp_token').
 import { getToken } from './authApi.js';
-import { cached, peek, invalidate } from '../utils/apiCache.js';
+import { cached, peek, peekStale, invalidate } from '../utils/apiCache.js';
 
 // In dev, Vite proxies /api -> http://localhost:5000 (see vite.config.js).
 // In production set VITE_API_URL=https://your-api-host/api
@@ -51,6 +51,10 @@ export async function listChats() {
  *  switching back paints instantly with no skeleton flash. */
 export const peekChatList = () => peek('chat:list');
 export const peekChat = (id) => peek(`chat:${encodeURIComponent(id)}`);
+
+/** Stale variants — instant paint on reloads while revalidating. */
+export const peekStaleChatList = () => peekStale('chat:list');
+export const peekStaleChat = (id) => peekStale(`chat:${encodeURIComponent(id)}`);
 
 /** POST /api/chat -> { id, title, messages: [] } */
 export async function createChat() {

@@ -33,7 +33,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 // community -> Reddit-style per-distro channels (posts/comments/votes, all protected)
 app.use('/api/community', communityRoutes);
-// quiz -> AI-powered "Find Your Distro" recommendation (public, rule-based fallback)
+// quiz -> fully-AI "Find Your Distro" recommendation (public, error + retry on AI failure)
 app.use('/api/quiz', quizRoutes);
 
 // 404 + error handler (must be last)

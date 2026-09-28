@@ -2,7 +2,7 @@
 // All endpoints are protected: every request carries the Bearer token
 // from authApi (localStorage 'dp_token').
 import { getToken } from './authApi.js';
-import { cached, peek, invalidate } from '../utils/apiCache.js';
+import { cached, peek, peekStale, invalidate } from '../utils/apiCache.js';
 
 // In dev, Vite proxies /api -> http://localhost:5000 (see vite.config.js).
 // In production set VITE_API_URL=https://your-api-host/api
@@ -65,6 +65,24 @@ export async function listPosts({ channel = 'all', sort = 'hot', search = '', pa
  *  switching back paints instantly with no skeleton flash. */
 export const peekPosts = (params) => peek(postsKey(params));
 
+/** Stale variant — paints even expired data instantly while revalidating
+ *  (kills reload spinners in production). */
+export const peekStalePosts = (params) => peekStale(postsKey(params));
+
+/** Synchronous cache read — PostDetailPage inits from this (same TTL). */
+export const peekPost = (id) => peek(`community:post:${encodeURIComponent(id)}`);
+
+/** Stale variant — instant paint on reloads while revalidating. */
+export const peekStalePost = (id) => peekStale(`community:post:${encodeURIComponent(id)}`);
+
+/** Synchronous cache read — sidebar stat cards init from this. */
+export const peekChannelStats = (channel = 'all') =>
+  peek(`community:stats:${encodeURIComponent(channel)}`);
+
+/** Stale variant — instant paint on reloads while revalidating. */
+export const peekStaleChannelStats = (channel = 'all') =>
+  peekStale(`community:stats:${encodeURIComponent(channel)}`);
+
 /** POST /api/community/posts { channel, title, body?, linkUrl? } -> post */
 export async function createPost({ channel, title, body, linkUrl }) {
   const json = await request('/community/posts', {
@@ -72,6 +90,7 @@ export async function createPost({ channel, title, body, linkUrl }) {
     body: { channel, title, body, linkUrl },
   });
   invalidate('community:posts');
+  invalidate('community:stats');
   return json.data;
 }
 
@@ -102,6 +121,7 @@ export async function deletePost(id) {
   });
   invalidate('community:post');
   invalidate('community:posts');
+  invalidate('community:stats');
   return json;
 }
 
@@ -125,6 +145,7 @@ export async function addComment(postId, { body, parentId } = {}) {
   );
   invalidate('community:post');
   invalidate('community:posts');
+  invalidate('community:stats');
   return json.data;
 }
 
@@ -145,6 +166,7 @@ export async function deleteComment(id) {
   });
   invalidate('community:post');
   invalidate('community:posts');
+  invalidate('community:stats');
   return json;
 }
 
@@ -160,10 +182,13 @@ export async function voteComment(id, value) {
 
 /** GET /api/community/stats?channel= -> { posts, comments } */
 export async function getChannelStats(channel = 'all') {
-  const json = await request(
-    `/community/stats?channel=${encodeURIComponent(channel)}`
-  );
-  return json.data;
+  // Counts move slowly — 60s TTL keeps every sidebar/stat card instant.
+  return cached(`community:stats:${encodeURIComponent(channel)}`, 60 * 1000, async () => {
+    const json = await request(
+      `/community/stats?channel=${encodeURIComponent(channel)}`
+    );
+    return json.data;
+  });
 }
 
 /** POST /api/community/suggest-channel { title, body? } -> { channel, confidence } */

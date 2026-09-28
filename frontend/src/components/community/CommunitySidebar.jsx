@@ -5,13 +5,13 @@ import { RailCard } from './CommunityShell.jsx';
 import { RailListSkeleton } from '../Skeleton.jsx';
 import { ChannelAvatar } from './Avatar.jsx';
 import { timeAgo } from '../../utils/timeAgo.js';
-import { listPosts, getChannelStats } from '../../services/communityApi.js';
+import { listPosts, getChannelStats, peekChannelStats, peekStaleChannelStats, peekPosts, peekStalePosts } from '../../services/communityApi.js';
 
 const railText = { fontFamily: MONO, fontSize: '0.72rem', color: THEME.silver, lineHeight: 1.6 };
 
 /** "About" card: totals across the whole community. */
 export function AboutCommunity() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState(() => peekChannelStats('all') ?? peekStaleChannelStats('all'));
   useEffect(() => {
     let cancelled = false;
     getChannelStats('all')
@@ -118,7 +118,9 @@ export function AboutChannel({ channel, distro, stats }) {
 
 /** "Recent posts" card: five newest posts across all channels. */
 export function RecentPosts({ onOpen }) {
-  const [recent, setRecent] = useState(null);
+  const [recent, setRecent] = useState(
+    () => peekPosts({ sort: 'new', page: 1, limit: 5 })?.posts ?? peekStalePosts({ sort: 'new', page: 1, limit: 5 })?.posts ?? null
+  );
 
   useEffect(() => {
     let cancelled = false;
