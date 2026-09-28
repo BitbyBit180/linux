@@ -514,6 +514,7 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
       if (cancelled || !window.google?.accounts?.id) return;
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
+        data_type: 'standard',
         callback: handleGoogle,
       });
     };
