@@ -45,25 +45,6 @@ const sectionLabel = {
  */
 export default function CommunityNav({ distros, channel, onNavigate, onChannel, onCreatePost }) {
   const [channelsExpanded, setChannelsExpanded] = useState(false);
-  const navLink = (label, icon, to) => (
-    <button
-      key={label}
-      type="button"
-      style={navBtn(false)}
-      onClick={() => onNavigate?.(to)}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-        e.currentTarget.style.color = THEME.textMain;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = 'rgba(240,244,248,0.65)';
-      }}
-    >
-      {icon}
-      {label}
-    </button>
-  );
 
   const channelRow = (key, label, distro) => {
     const active = channel === key;
@@ -149,7 +130,32 @@ export default function CommunityNav({ distros, channel, onNavigate, onChannel, 
         Create post
       </button>
 
-      {navLink('Home', <Home size={17} />, '/community')}
+      {/* Home resets the feed to All. Navigating to '/community' alone would
+          be a no-op when already there (identical route state → React bails
+          out of the render), so the channel reset is what makes it work. */}
+      <button
+        type="button"
+        style={navBtn(channel === 'all')}
+        onClick={() => {
+          onChannel?.('all');
+          onNavigate?.('/community');
+        }}
+        onMouseEnter={(e) => {
+          if (channel !== 'all') {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+            e.currentTarget.style.color = THEME.textMain;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (channel !== 'all') {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = 'rgba(240,244,248,0.65)';
+          }
+        }}
+      >
+        <Home size={17} />
+        Home
+      </button>
 
       <div style={sectionLabel}>Channels</div>
       {channelRow('general', 'General', null)}
