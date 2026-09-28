@@ -774,21 +774,39 @@ function Sidebar({
             borderBottom: `1px solid ${LINE}`,
           }}
         >
-          <Bot size={19} color={THEME.accent} />
-          <span
+          <button
+            type="button"
+            onClick={onNavigateHome}
+            title="Back to DistroPedia home"
             style={{
               flex: 1,
-              fontFamily: MONO,
-              fontSize: '0.92rem',
-              fontWeight: 800,
-              letterSpacing: '0.04em',
-              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 9,
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              textAlign: 'left',
+              minWidth: 0,
             }}
           >
-            <span style={{ color: THEME.textMain }}>Distro</span>
-            <span style={{ color: THEME.accent }}>Pedia</span>
-            <span style={{ color: THEME.silver }}> AI</span>
-          </span>
+            <Bot size={19} color={THEME.accent} />
+            <span
+              style={{
+                flex: 1,
+                fontFamily: MONO,
+                fontSize: '0.92rem',
+                fontWeight: 800,
+                letterSpacing: '0.04em',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span style={{ color: THEME.textMain }}>Distro</span>
+              <span style={{ color: THEME.accent }}>Pedia</span>
+              <span style={{ color: THEME.silver }}> AI</span>
+            </span>
+          </button>
           <button
             type="button"
             title={overlay ? 'Close sidebar' : 'Collapse sidebar'}
