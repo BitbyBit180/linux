@@ -18,9 +18,11 @@ export function useDistro(distroId) {
   const [otherDistros, setOtherDistros] = useState(() =>
     DISTROS.filter((d) => d.id !== findLocal(distroId).id).slice(0, 4)
   );
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setDistro(findLocal(distroId));
+    setLoading(true);
     let cancelled = false;
     getDistroById(distroId).then((d) => {
       if (!cancelled && d) {
@@ -31,11 +33,12 @@ export function useDistro(distroId) {
           }
         });
       }
+      if (!cancelled) setLoading(false);
     });
     return () => {
       cancelled = true;
     };
   }, [distroId]);
 
-  return { distro, otherDistros };
+  return { distro, otherDistros, loading };
 }

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Plus, X, Scale, Search } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import DistroIcon from '../components/DistroIcon.jsx';
+import { CompareTableSkeleton } from '../components/Skeleton.jsx';
 import { useDistros } from '../hooks/useDistros.js';
 import { useCompare, MAX_COMPARE } from '../hooks/useCompare.js';
 import { THEME, LINE, MONO } from '../theme/designTokens.js';
@@ -258,10 +259,8 @@ export default function ComparePage({ query, onNavigate }) {
         </div>
 
         {/* Comparison table */}
-        {loading && !hasSelection ? (
-          <div className="py-20 text-center font-mono text-sm text-white/45">
-            Loading comparison data…
-          </div>
+        {loading ? (
+          <CompareTableSkeleton cols={Math.max(selectedIds.length, 1)} />
         ) : !hasSelection ? (
           <div className="text-center py-16 bg-white/[0.02] rounded-3xl border border-white/10 backdrop-blur-sm">
             <Scale size={36} className="mx-auto mb-4 text-white/25" />

@@ -29,6 +29,7 @@ import NotificationBell from '../components/community/NotificationBell.jsx';
 import ReportButton from '../components/community/ReportButton.jsx';
 import { ChannelAvatar } from '../components/community/Avatar.jsx';
 import { RowAction } from '../components/community/PostCard.jsx';
+import { PostDetailSkeleton } from '../components/Skeleton.jsx';
 import CommentItem from '../components/community/CommentItem.jsx';
 import CommunityShell from '../components/community/CommunityShell.jsx';
 import { RailCard } from '../components/community/CommunityShell.jsx';
@@ -852,17 +853,7 @@ export default function PostDetailPage({ postId, onNavigate }) {
       </div>
 
         {loading ? (
-          <p
-            style={{
-              fontFamily: MONO,
-              fontSize: '0.78rem',
-              color: THEME.textMuted,
-              textAlign: 'center',
-              padding: '48px 0',
-            }}
-          >
-            Loading post…
-          </p>
+          <PostDetailSkeleton />
         ) : error && !post ? (
           <p
             style={{

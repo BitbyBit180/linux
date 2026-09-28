@@ -8,6 +8,7 @@ import PostCard from '../components/community/PostCard.jsx';
 import NotificationBell from '../components/community/NotificationBell.jsx';
 import CommunityShell from '../components/community/CommunityShell.jsx';
 import { RailCard } from '../components/community/CommunityShell.jsx';
+import { CommunityFeedSkeleton } from '../components/Skeleton.jsx';
 import CommunityNav from '../components/community/CommunityNav.jsx';
 import { MobileChannelBar } from '../components/community/CommunityNav.jsx';
 import {
@@ -619,17 +620,7 @@ export default function CommunityPage({ onNavigate }) {
       {/* Feed: flat rows inside one glass panel (Reddit list style) */}
       <div style={{ ...GLASS, borderRadius: 18, padding: '6px 18px 6px', overflow: 'hidden' }}>
         {loading ? (
-          <p
-            style={{
-              fontFamily: MONO,
-              fontSize: '0.78rem',
-              color: THEME.textMuted,
-              textAlign: 'center',
-              padding: '48px 0',
-            }}
-          >
-            Loading posts…
-          </p>
+          <CommunityFeedSkeleton count={4} />
         ) : posts.length === 0 ? (
           <div style={{ padding: '42px 16px', textAlign: 'center' }}>
             <p

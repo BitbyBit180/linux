@@ -20,22 +20,23 @@ export function useDistros() {
   const [distros, setDistros] = useState(DISTROS);
   const [popularDistros, setPopularDistros] = useState(POPULAR_DISTROS);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    getDistros().then((d) => {
-      if (!cancelled && d?.length) setDistros(d);
-    });
-    getPopularDistros().then((d) => {
-      if (!cancelled && d?.length) setPopularDistros(d);
-    });
-    getCategories().then((c) => {
-      if (!cancelled && c?.length) setCategories(c);
-    });
+    Promise.allSettled([getDistros(), getPopularDistros(), getCategories()]).then(
+      ([d, p, c]) => {
+        if (cancelled) return;
+        if (d.status === 'fulfilled' && d.value?.length) setDistros(d.value);
+        if (p.status === 'fulfilled' && p.value?.length) setPopularDistros(p.value);
+        if (c.status === 'fulfilled' && c.value?.length) setCategories(c.value);
+        setLoading(false);
+      }
+    );
     return () => {
       cancelled = true;
     };
   }, []);
 
-  return { distros, popularDistros, categories };
+  return { distros, popularDistros, categories, loading };
 }

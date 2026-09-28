@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
+import { QuizResultSkeleton } from '../components/Skeleton.jsx';
 import { useDistros } from '../hooks/useDistros.js';
 import { QUIZ_QUESTIONS, scoreQuiz } from '../utils/distroQuiz.js';
 import { getAiRecommendation } from '../services/quizApi.js';
@@ -206,51 +207,8 @@ export default function QuizPage({ onNavigate }) {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            style={{
-              borderRadius: 20,
-              padding: '40px 24px',
-              textAlign: 'center',
-              border: `1px solid ${LINE}`,
-              background: 'rgba(28, 34, 41, 0.55)',
-            }}
           >
-            <div
-              className="flex items-center justify-center mx-auto animate-pulse"
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 9999,
-                background: 'rgba(224, 90, 56, 0.15)',
-                border: '1px solid rgba(224, 90, 56, 0.4)',
-                marginBottom: 16,
-              }}
-            >
-              <Sparkles size={24} color={THEME.accent} />
-            </div>
-            <p
-              style={{
-                fontFamily: MONO,
-                fontSize: '0.88rem',
-                fontWeight: 700,
-                color: THEME.textMain,
-                margin: '0 0 6px',
-              }}
-            >
-              Finding your distro…
-            </p>
-            <p
-              style={{
-                fontFamily: MONO,
-                fontSize: '0.72rem',
-                color: THEME.textMuted,
-                margin: 0,
-                lineHeight: 1.7,
-              }}
-            >
-              Comparing all 14 distros against your answers.
-              <br />
-              Your ranked result appears here in a moment.
-            </p>
+            <QuizResultSkeleton />
           </motion.div>
         ) : (
           /* ------------------------------ results ------------------------------ */

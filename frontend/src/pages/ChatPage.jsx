@@ -34,6 +34,7 @@ import {
   sendMessage,
 } from '../services/chatApi.js';
 import { THEME, LINE, LINE_SOFT, MONO } from '../theme/designTokens.js';
+import { ChatListSkeleton, ChatMessagesSkeleton } from '../components/Skeleton.jsx';
 
 /* --------------------------------- tokens --------------------------------- */
 
@@ -838,18 +839,9 @@ function Sidebar({
         {/* History list */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px 10px' }}>
           {chatsLoading && chats.length === 0 && (
-            <p
-              style={{
-                fontFamily: MONO,
-                fontSize: '0.72rem',
-                color: THEME.textMuted,
-                textAlign: 'center',
-                padding: '18px 8px',
-                margin: 0,
-              }}
-            >
-              Loading chats…
-            </p>
+            <div style={{ padding: '6px 2px' }}>
+              <ChatListSkeleton count={5} />
+            </div>
           )}
           {chatsError && chats.length === 0 && !chatsLoading && (
             <div style={{ textAlign: 'center', padding: '14px 8px' }}>
@@ -1677,19 +1669,11 @@ export default function ChatPage({ onNavigate }) {
               }}
             >
               <div style={{ maxWidth: 780, margin: '0 auto' }}>
-                {loadingChat && (
-                  <p
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: '0.76rem',
-                      color: THEME.textMuted,
-                      textAlign: 'center',
-                      padding: '40px 0',
-                    }}
-                  >
-                    Loading conversation…
-                  </p>
-                )}
+                {loadingChat && messages.length === 0 ? (
+                  <div style={{ padding: '12px 0 24px' }}>
+                    <ChatMessagesSkeleton count={3} />
+                  </div>
+                ) : null}
                 {messages.map((msg, i) => {
                   // While the reveal is in progress, the last assistant message
                   // renders its partial content; sources appear only at the end.

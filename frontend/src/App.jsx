@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { THEME, MONO } from './theme/designTokens.js';
+import { PageSkeleton } from './components/Skeleton.jsx';
 
 // Route-split: each page loads on demand so the initial bundle stays small.
 // (Vite emits one chunk per page; see the build output.)
@@ -92,21 +92,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-transparent text-[#F0F4F8]">
-      <Suspense
-        fallback={
-          <div
-            className="flex items-center justify-center"
-            style={{
-              minHeight: '100vh',
-              fontFamily: MONO,
-              fontSize: '0.8rem',
-              color: THEME.textMuted,
-            }}
-          >
-            Loading…
-          </div>
-        }
-      >
+      <Suspense fallback={<PageSkeleton />}>
       {isDistroDetail ? (
         <DistroDetailPage distroId={distroId} onNavigate={navigate} />
       ) : isFlavours ? (

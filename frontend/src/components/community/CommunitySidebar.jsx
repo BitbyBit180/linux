@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Globe, Lock, FileText } from 'lucide-react';
 import { THEME, LINE, MONO } from '../../theme/designTokens.js';
 import { RailCard } from './CommunityShell.jsx';
+import { RailListSkeleton } from '../Skeleton.jsx';
 import { ChannelAvatar } from './Avatar.jsx';
 import { timeAgo } from '../../utils/timeAgo.js';
 import { listPosts, getChannelStats } from '../../services/communityApi.js';
@@ -131,9 +132,7 @@ export function RecentPosts({ onOpen }) {
 
   return (
     <RailCard label="Recent posts">
-      {recent === null && (
-        <p style={{ ...railText, margin: 0, fontSize: '0.66rem' }}>Loading…</p>
-      )}
+      {recent === null && <RailListSkeleton count={4} />}
       {recent?.length === 0 && (
         <p style={{ ...railText, margin: 0, fontSize: '0.66rem' }}>Nothing posted yet.</p>
       )}

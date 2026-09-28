@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from '../components/Navbar.jsx';
 import DistroCard from '../components/DistroCard.jsx';
+import { DistroGridSkeleton, Skeleton } from '../components/Skeleton.jsx';
 import { useDistros } from '../hooks/useDistros.js';
 import { THEME } from '../theme/designTokens.js';
 
@@ -78,7 +79,7 @@ export default function FlavoursPage({ onNavigate }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   // Catalogue from the API (hook falls back to local static data offline)
-  const { distros, popularDistros, categories } = useDistros();
+  const { distros, popularDistros, categories, loading } = useDistros();
 
   // Filtered distros based on search and category
   const filteredAllDistros = useMemo(() => {
@@ -225,6 +226,9 @@ export default function FlavoursPage({ onNavigate }) {
             </div>
 
             {/* Popular 5 Distros Grid (Ubuntu, Debian, Kali, Arch, Fedora) */}
+            {loading ? (
+              <DistroGridSkeleton count={5} />
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5 sm:gap-6">
               {filteredPopularDistros.map((distro) => (
                 <DistroCard
@@ -234,6 +238,7 @@ export default function FlavoursPage({ onNavigate }) {
                 />
               ))}
             </div>
+            )}
           </section>
         )}
 
@@ -246,7 +251,14 @@ export default function FlavoursPage({ onNavigate }) {
 
             {/* Category Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-2 sm:pb-0 scrollbar-none">
-              {categories.map((cat) => {
+              {loading ? (
+                <div aria-hidden="true" className="flex items-center gap-1.5">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} width={64 + (i % 3) * 14} height={30} radius={9999} />
+                  ))}
+                </div>
+              ) : (
+              categories.map((cat) => {
                 const isSelected = selectedCategory === cat;
                 return (
                   <button
@@ -269,12 +281,15 @@ export default function FlavoursPage({ onNavigate }) {
                     {cat}
                   </button>
                 );
-              })}
+              })
+              )}
             </div>
           </div>
 
           {/* All Distros Grid */}
-          {filteredAllDistros.length > 0 ? (
+          {loading ? (
+            <DistroGridSkeleton count={10} />
+          ) : filteredAllDistros.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5 sm:gap-6">
               {filteredAllDistros.map((distro) => (
                 <DistroCard

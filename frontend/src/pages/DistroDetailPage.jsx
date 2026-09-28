@@ -29,6 +29,7 @@ import {
   X
 } from 'lucide-react';
 import DistroIcon from '../components/DistroIcon.jsx';
+import { DistroDetailSkeleton } from '../components/Skeleton.jsx';
 import { getInstallationData } from '../data/installGuide.js';
 import { useDistro } from '../hooks/useDistro.js';
 import { THEME } from '../theme/designTokens.js';
@@ -148,7 +149,7 @@ export default function DistroDetailPage({ distroId, onNavigate }) {
 
   // Full detail (specs + install guide) from the API;
   // the hook falls back to local static data when offline.
-  const { distro, otherDistros } = useDistro(distroId);
+  const { distro, otherDistros, loading } = useDistro(distroId);
 
   // Install guide comes from the DB (`installGuide` on the API doc).
   // The local generator is offline fallback only — not hardcoded content.
@@ -354,6 +355,10 @@ export default function DistroDetailPage({ distroId, onNavigate }) {
 
       {/* Main Content — Specifications remain below the fold until scroll */}
       <main className="relative z-10 flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-24">
+        {loading ? (
+          <DistroDetailSkeleton />
+        ) : (
+          <>
         {/* Distro Hero Header — Full Viewport First Screen */}
         <div id="section-hero" className="w-full min-h-[calc(100vh-6.5rem)] flex flex-col items-center text-center justify-center gap-6 pb-12 mx-auto">
           {/* Logo — Centered in the middle of the page */}
@@ -740,6 +745,8 @@ export default function DistroDetailPage({ distroId, onNavigate }) {
             ))}
           </div>
         </section>
+          </>
+        )}
       </main>
 
       {/* Floating Side Navigation Dock — appears smoothly after scrolling & expands on hover */}
