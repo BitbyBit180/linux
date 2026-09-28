@@ -283,7 +283,10 @@ export const googleAuth = asyncHandler(async (req, res) => {
       `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
       { signal: AbortSignal.timeout(10000) }
     );
-    if (!r.ok) throw new Error('tokeninfo rejected');
+    if (!r.ok) {
+      console.error(`[google] tokeninfo rejected: http ${r.status}`);
+      throw new Error('tokeninfo rejected');
+    }
     claims = await r.json();
   } catch {
     res.status(401);
@@ -291,13 +294,17 @@ export const googleAuth = asyncHandler(async (req, res) => {
   }
 
   const nowSec = Math.floor(Date.now() / 1000);
-  if (
-    claims.aud !== clientId ||
-    claims.email_verified !== 'true' ||
-    Number(claims.exp) < nowSec ||
-    !claims.email ||
-    !claims.sub
-  ) {
+  const audOk = claims.aud === clientId;
+  const verifiedOk = claims.email_verified === 'true';
+  const expOk = Number(claims.exp) >= nowSec;
+  const fieldsOk = Boolean(claims.email && claims.sub);
+  if (!audOk || !verifiedOk || !expOk || !fieldsOk) {
+    // clientId is public (it's in the frontend bundle), safe to compare tails.
+    console.error(
+      `[google] claims check failed: audOk=${audOk} verifiedOk=${verifiedOk} ` +
+        `expOk=${expOk} fieldsOk=${fieldsOk} ` +
+        `gotAud=...${String(claims.aud || '').slice(-8)} wantAud=...${clientId.slice(-8)}`
+    );
     res.status(401);
     throw new Error('Google account could not be verified.');
   }
