@@ -449,7 +449,26 @@ export default function AuthPage({ onAuthSuccess, onNavigate }) {
     setError(null);
     window.google.accounts.id.prompt((notification) => {
       try {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        if (typeof notification.isDisplayed === 'function' && notification.isDisplayed()) return;
+        const reason =
+          typeof notification.getNotDisplayedReason === 'function'
+            ? notification.getNotDisplayedReason()
+            : '';
+        if (
+          reason === 'opt_out_or_no_session' ||
+          reason === 'suppressed_by_user' ||
+          reason === 'fedcm_disabled'
+        ) {
+          // Chrome disabled FedCM for this site (usually after dismissing the
+          // prompt before). Re-enable: icon left of the address bar →
+          // Site settings → Third-party sign-in → Allow, then retry.
+          setError(
+            'Google sign-in is turned off for this site in your browser — click the icon left of the address bar → Site settings → Third-party sign-in → Allow, then try again.'
+          );
+        } else if (
+          notification.isNotDisplayed() ||
+          notification.isSkippedMoment?.()
+        ) {
           setError(
             'Google sign-in was blocked or dismissed — allow third-party sign-in and try again, or use email instead.'
           );
