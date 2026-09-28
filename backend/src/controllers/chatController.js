@@ -4,7 +4,7 @@ import { searchReddit } from '../services/redditService.js';
 import { runWebResearch } from '../services/webResearchAgent.js';
 import { synthesizeAnswer, synthesizeAnswerStream } from '../services/synthesizerAgent.js';
 import { filterSources } from '../services/citationAgent.js';
-import { NO_KEY_MESSAGE } from '../services/groqClient.js';
+import { NO_KEY_MESSAGE, hasGroqKeys } from '../services/groqClient.js';
 
 // Chats are private: a mismatch is reported as 404 so we don't leak existence.
 const findOwnedChat = async (req, res) => {
@@ -76,7 +76,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
   }
 
   // Fast-fail before doing any work or saving anything.
-  if (!process.env.GROQ_API_KEY || !process.env.GROQ_API_KEY.trim()) {
+  if (!hasGroqKeys()) {
     res.status(503).json({ success: false, message: NO_KEY_MESSAGE });
     return;
   }
@@ -189,7 +189,7 @@ export const sendMessageStream = async (req, res) => {
       res.status(400).json({ success: false, message: 'Message content is required' });
       return;
     }
-    if (!process.env.GROQ_API_KEY || !process.env.GROQ_API_KEY.trim()) {
+    if (!hasGroqKeys()) {
       res.status(503).json({ success: false, message: NO_KEY_MESSAGE });
       return;
     }
